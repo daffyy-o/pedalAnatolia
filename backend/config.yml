@@ -1,0 +1,18 @@
+graphhopper:
+  import.osm.ignored_highways: ""
+  graph.encoded_values: bike_priority, bike_access, roundabout, road_class, bike_average_speed
+  datareader.file: istanbul-latest.osm.pbf
+  graph.location: graph-cache
+  profiles:
+    - name: bike
+      weighting: custom
+      custom_model_files: [bike.json, custom-bike-model.json]
+    - name: bike_school_zones
+      weighting: custom
+      custom_model_files: [bike.json, custom-bike-school-model.json]
+
+server:
+  application_connectors:
+  - type: http
+    port: 8989
+    bind_host: 0.0.0.0

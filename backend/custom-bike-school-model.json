@@ -1,0 +1,34 @@
+{
+  "priority": [
+    {
+      "if": "road_class == MOTORWAY || road_class == TRUNK",
+      "multiply_by": "0.0"
+    },
+    {
+      "if": "in_school_zone",
+      "multiply_by": "0.1"
+    }
+  ],
+  "areas": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "school_zone",
+        "properties": {},
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [28.97, 41.01],
+              [28.98, 41.01],
+              [28.98, 41.02],
+              [28.97, 41.02],
+              [28.97, 41.01]
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}
