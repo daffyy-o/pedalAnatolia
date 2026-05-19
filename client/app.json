@@ -21,10 +21,21 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBoWQDG29MsyNMtLdRlLUWfGhuEiNHE3e0"
+        }
+      },
+      "package": "com.justagamer.client"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2322c1a8-f54d-4678-8306-1a666a725076"
+      }
     }
   }
 }

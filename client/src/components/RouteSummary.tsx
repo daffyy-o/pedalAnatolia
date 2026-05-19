@@ -1,12 +1,18 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import InstructionList from './InstructionList';
+import { RouteInstruction } from '../lib/api';
 
 interface RouteSummaryProps {
   distance: number; // in meters
   time: number; // in milliseconds
+  instructions?: RouteInstruction[];
+  onSaveRoute?: () => void;
 }
 
-export default function RouteSummary({ distance, time }: RouteSummaryProps) {
+export default function RouteSummary({ distance, time, instructions, onSaveRoute }: RouteSummaryProps) {
+  const [showSteps, setShowSteps] = useState(false);
+
   const formatDistance = (m: number) => {
     if (m < 1000) return `${Math.round(m)} m`;
     return `${(m / 1000).toFixed(2)} km`;
@@ -31,6 +37,30 @@ export default function RouteSummary({ distance, time }: RouteSummaryProps) {
         <Text style={styles.label}>Estimated Time:</Text>
         <Text style={styles.value}>{formatTime(time)}</Text>
       </View>
+
+      <View style={styles.buttonRow}>
+        {onSaveRoute && (
+          <TouchableOpacity 
+            style={[styles.button, styles.saveButton]} 
+            onPress={onSaveRoute}
+          >
+            <Text style={styles.saveButtonText}>⭐ Save Route</Text>
+          </TouchableOpacity>
+        )}
+        
+        {instructions && instructions.length > 0 && (
+          <TouchableOpacity 
+            style={[styles.button, styles.stepsButton]} 
+            onPress={() => setShowSteps(!showSteps)}
+          >
+            <Text style={styles.buttonText}>
+              {showSteps ? 'Hide Steps' : 'Show Steps'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      
+      {showSteps && instructions && <InstructionList instructions={instructions} />}
     </View>
   );
 }
@@ -62,5 +92,32 @@ const styles = StyleSheet.create({
   },
   value: {
     fontWeight: '500',
-  }
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  button: {
+    padding: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    flex: 1,
+  },
+  saveButton: {
+    backgroundColor: '#ffeb3b',
+    marginRight: 5,
+  },
+  stepsButton: {
+    backgroundColor: '#f0f0f0',
+    marginLeft: 5,
+  },
+  saveButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  buttonText: {
+    color: '#4A90E2',
+    fontWeight: 'bold',
+  },
 });

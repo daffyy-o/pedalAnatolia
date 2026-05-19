@@ -1,11 +1,22 @@
 import axios from 'axios';
 
+import { Platform } from 'react-native';
+
 // Get base URL from environment or fallback for local development
-const BASE_URL = process.env.EXPO_PUBLIC_GRAPHHOPPER_BASE_URL || 'http://10.5.57.105:8989';
+const BASE_URL = process.env.EXPO_PUBLIC_GRAPHHOPPER_BASE_URL || 
+  (Platform.OS === 'web' ? 'http://localhost:8989' : 'http://10.2.122.52:8989');
 
 export interface RouteCoordinate {
   lat: number;
   lon: number;
+}
+
+export interface RouteInstruction {
+  text: string;
+  distance: number;
+  time: number;
+  sign: number;
+  street_name?: string;
 }
 
 export interface RouteResponse {
@@ -15,6 +26,7 @@ export interface RouteResponse {
   };
   distance: number;
   time: number;
+  instructions: RouteInstruction[];
 }
 
 export const fetchRoute = async (
@@ -57,6 +69,7 @@ export const fetchRoute = async (
       geometry: path.points,
       distance: path.distance,
       time: path.time,
+      instructions: path.instructions || [],
     };
   } catch (error: any) {
     if (axios.isAxiosError(error)) {

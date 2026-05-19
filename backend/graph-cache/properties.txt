@@ -1,6 +1,6 @@
-datareader.import.date=2026-04-15T14:26:06Z
+datareader.import.date=2026-04-29T21:04:44Z
 datareader.data.date=2026-04-10T23:00:00Z
-profiles=bike|-627299659,bike_school_zones|1540441868
+profiles=bike|-1331427533,bike_school_zones|-1714653418
 graph.em.version=3
 graph.em.ints_for_flags=2
 graph.em.ints_for_turn_cost_flags=0
