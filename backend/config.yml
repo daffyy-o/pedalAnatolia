@@ -1,7 +1,7 @@
 graphhopper:
   import.osm.ignored_highways: ""
-  graph.encoded_values: bike_priority, bike_access, roundabout, road_class, bike_average_speed
-  datareader.file: istanbul-latest.osm.pbf
+  graph.encoded_values: bike_priority, bike_access, roundabout, road_class, road_environment, bike_average_speed
+  datareader.file: turkey-260226.osm.pbf
   graph.location: graph-cache
   profiles:
     - name: bike
@@ -16,3 +16,8 @@ server:
   - type: http
     port: 8989
     bind_host: 0.0.0.0
+  # Keep admin off 8081 so Expo Metro can use the default port
+  admin_connectors:
+  - type: http
+    port: 8089
+    bind_host: 127.0.0.1

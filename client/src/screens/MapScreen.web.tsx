@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, Platform, Modal, TextInput, Button } from 'react-native';
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -6,11 +6,13 @@ import L from 'leaflet';
 
 import SearchBar from '../components/SearchBar';
 import RouteSummary from '../components/RouteSummary';
-import { fetchRoute, RouteCoordinate, RouteResponse } from '../lib/api';
+import { useMapRouting } from '../hooks/useMapRouting';
+import { getSchoolZoneFeatures, zoneToMapCoords } from '../lib/schoolZones';
 import { usePreferences } from '../store/preferences';
+import { useSchoolZoneReports } from '../store/schoolZoneReports';
 import { useSavedRoutes } from '../store/savedRoutes';
+import { RouteResponse } from '../lib/api';
 
-// Fix Leaflet's default icon path issues
 if (Platform.OS === 'web') {
   delete (L.Icon.Default.prototype as any)._getIconUrl;
   L.Icon.Default.mergeOptions({
@@ -20,184 +22,111 @@ if (Platform.OS === 'web') {
   });
 }
 
-const MapEventHandler = ({ handleMapPress }: { handleMapPress: (e: any) => void }) => {
+function MapClicks({ onMapTap }: { onMapTap: (lat: number, lon: number) => void }) {
   useMapEvents({
-    click: (e) => {
-      handleMapPress({ nativeEvent: { coordinate: { latitude: e.latlng.lat, longitude: e.latlng.lng } } });
-    },
+    click: (e) => onMapTap(e.latlng.lat, e.latlng.lng),
   });
   return null;
-};
+}
 
-const FitBounds = ({ route }: { route: RouteResponse | null }) => {
+function FitBounds({ route }: { route: RouteResponse | null }) {
   const map = useMap();
   useEffect(() => {
     if (route && route.geometry.coordinates.length > 0) {
-      const bounds = L.latLngBounds(route.geometry.coordinates.map(c => [c[1], c[0]]));
+      const bounds = L.latLngBounds(route.geometry.coordinates.map((c) => [c[1], c[0]]));
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [route, map]);
   return null;
-};
+}
 
 export default function MapScreen({ route: navRoute, navigation }: any) {
-  const [origin, setOrigin] = useState<RouteCoordinate | null>(null);
-  const [destination, setDestination] = useState<RouteCoordinate | null>(null);
-  const [originName, setOriginName] = useState<string>('Map Point');
-  const [destinationName, setDestinationName] = useState<string>('Map Point');
-
-  const [route, setRoute] = useState<RouteResponse | null>(null);
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { avoidSchoolZonesDuringPeakHours } = usePreferences();
+  const { avoidSchoolZones } = usePreferences();
+  const overrides = useSchoolZoneReports((s) => s.overrides);
+  const schoolZones = useMemo(() => getSchoolZoneFeatures(overrides), [overrides]);
   const { addRoute } = useSavedRoutes();
 
-  // Save Modal State
+  const {
+    origin,
+    destination,
+    originName,
+    destinationName,
+    route,
+    errorText,
+    loading,
+    hint,
+    routeLineKey,
+    mapRenderVersion,
+    clearAll,
+    onMapTap,
+    onSearchPlace,
+    loadSavedRoute,
+  } = useMapRouting(avoidSchoolZones, schoolZones);
+
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [customRouteName, setCustomRouteName] = useState('');
-
-  const initialCenter: [number, number] = [39.92077, 32.85411]; // Turkey
-  const initialZoom = 6;
-
-  // Mock school zone for testing
-  const mockSchoolZoneWeb: [number, number][] = [
-    [41.01, 28.97],
-    [41.01, 28.98],
-    [41.02, 28.98],
-    [41.02, 28.97],
-  ];
+  const zoneLayerKey = `${mapRenderVersion}-${avoidSchoolZones}-${schoolZones.length}`;
 
   useEffect(() => {
     if (navRoute?.params?.loadRoute) {
-      const { origin: lOrg, destination: lDest, originName: lOrgName, destinationName: lDestName } = navRoute.params.loadRoute;
-      setOrigin(lOrg);
-      setOriginName(lOrgName);
-      setDestination(lDest);
-      setDestinationName(lDestName);
-      calculateRoute(lOrg, lDest);
+      loadSavedRoute(navRoute.params.loadRoute);
     }
-  }, [navRoute?.params?.loadRoute]);
-
-  const calculateRoute = async (start: RouteCoordinate, end: RouteCoordinate) => {
-    setLoading(true);
-    setErrorText(null);
-    setRoute(null);
-    try {
-      const response = await fetchRoute(start, end, avoidSchoolZonesDuringPeakHours);
-      setRoute(response);
-    } catch (err: any) {
-      setErrorText(err.message || 'An error occurred fetching the route.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMapPress = (e: any) => {
-    const { coordinate } = e.nativeEvent;
-    const coordStr = `Lat: ${coordinate.latitude.toFixed(4)}, Lon: ${coordinate.longitude.toFixed(4)}`;
-    
-    if (!origin) {
-      setOrigin({ lat: coordinate.latitude, lon: coordinate.longitude });
-      setOriginName(coordStr);
-    } else if (!destination) {
-      const dest = { lat: coordinate.latitude, lon: coordinate.longitude };
-      setDestination(dest);
-      setDestinationName(coordStr);
-      calculateRoute(origin, dest);
-    } else {
-      setOrigin({ lat: coordinate.latitude, lon: coordinate.longitude });
-      setOriginName(coordStr);
-      setDestination(null);
-      setDestinationName('Map Point');
-      setRoute(null);
-      setErrorText(null);
-    }
-  };
-
-  const handleSearchSelect = (place: any) => {
-    const coord = { lat: parseFloat(place.lat), lon: parseFloat(place.lon) };
-    const name = place.display_name || 'Selected Place';
-    
-    if (!origin) {
-      setOrigin(coord);
-      setOriginName(name);
-    } else if (!destination) {
-      setDestination(coord);
-      setDestinationName(name);
-      calculateRoute(origin, coord);
-    }
-  };
-
-  const handleSaveRoutePress = () => {
-    if (origin && destination) {
-      const shortOrigin = originName.split(',')[0];
-      const shortDest = destinationName.split(',')[0];
-      setCustomRouteName(`From ${shortOrigin} to ${shortDest}`);
-      setSaveModalVisible(true);
-    }
-  };
-
-  const confirmSaveRoute = () => {
-    if (origin && destination) {
-      addRoute({
-        name: customRouteName.trim() || 'Saved Route',
-        origin,
-        destination,
-        originName,
-        destinationName,
-      });
-      setSaveModalVisible(false);
-      alert('Route saved successfully!');
-    }
-  };
+  }, [navRoute?.params?.loadRoute, loadSavedRoute]);
 
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <SearchBar 
-          placeholder={!origin ? "Search for starting point..." : "Search for destination..."}
-          onPlaceSelect={handleSearchSelect} 
-        />
+        <SearchBar placeholder={!origin ? 'Search start...' : 'Search end...'} onPlaceSelect={onSearchPlace} />
+        <Text style={styles.hint}>{hint}</Text>
         <View style={styles.headerButtons}>
-          <Text 
-            style={styles.headerButton} 
-            onPress={() => navigation.navigate('SavedRoutes')}
-          >
-            Saved Routes
+          {(origin || destination || route) && (
+            <Text style={styles.headerButton} onPress={clearAll}>
+              Clear
+            </Text>
+          )}
+          <Text style={styles.headerButton} onPress={() => navigation.navigate('ReportSchoolZone')}>
+            Report
           </Text>
-          <Text 
-            style={styles.headerButton} 
-            onPress={() => navigation.navigate('Settings')}
-          >
+          <Text style={styles.headerButton} onPress={() => navigation.navigate('SavedRoutes')}>
+            Saved
+          </Text>
+          <Text style={styles.headerButton} onPress={() => navigation.navigate('Settings')}>
             Settings
           </Text>
         </View>
       </View>
 
       <View style={styles.mapContainer}>
-        <MapContainer 
-          center={initialCenter} 
-          zoom={initialZoom} 
-          style={{ height: '100%', width: '100%' }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapEventHandler handleMapPress={handleMapPress} />
+        <MapContainer center={[39.92, 32.85]} zoom={6} style={{ height: '100%', width: '100%' }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapClicks onMapTap={onMapTap} />
           <FitBounds route={route} />
-
-          <Polygon 
-            positions={mockSchoolZoneWeb}
-            pathOptions={{ color: 'red', fillColor: 'red', fillOpacity: 0.2 }}
-          />
-
-          {origin && <Marker position={[origin.lat, origin.lon]} title="Origin" />}
-          {destination && <Marker position={[destination.lat, destination.lon]} title="Destination" />}
-          
+          {avoidSchoolZones &&
+            schoolZones.map((zone) => (
+              <Polygon
+                key={`${zoneLayerKey}-zone-${String(zone.id)}`}
+                positions={zoneToMapCoords(zone).map((c) => [c.latitude, c.longitude] as [number, number])}
+                pathOptions={{ color: '#c62828', fillColor: '#ef5350', fillOpacity: 0.2, weight: 2 }}
+              />
+            ))}
+          {origin && (
+            <Marker
+              key={`${zoneLayerKey}-start-${origin.lat}-${origin.lon}`}
+              position={[origin.lat, origin.lon]}
+              title="Start"
+            />
+          )}
+          {destination && (
+            <Marker
+              key={`${zoneLayerKey}-end-${destination.lat}-${destination.lon}`}
+              position={[destination.lat, destination.lon]}
+              title="End"
+            />
+          )}
           {route && (
-            <Polyline 
-              positions={route.geometry.coordinates.map(c => [c[1], c[0]])}
+            <Polyline
+              key={routeLineKey}
+              positions={route.geometry.coordinates.map((c) => [c[1], c[0]])}
               color="#4A90E2"
               weight={4}
             />
@@ -206,46 +135,48 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
       </View>
 
       <View style={styles.overlay}>
-        {loading && <ActivityIndicator size="large" color="#4A90E2" style={styles.loader} />}
+        {loading && <ActivityIndicator size="large" color="#4A90E2" />}
         {errorText && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{errorText}</Text>
           </View>
         )}
         {route && !errorText && (
-          <RouteSummary 
-            distance={route.distance} 
-            time={route.time} 
-            instructions={route.instructions} 
-            onSaveRoute={handleSaveRoutePress}
+          <RouteSummary
+            distance={route.distance}
+            time={route.time}
+            instructions={route.instructions}
+            onSaveRoute={() => {
+              setCustomRouteName(`From ${originName} to ${destinationName}`);
+              setSaveModalVisible(true);
+            }}
+            schoolZonesAvoided={avoidSchoolZones}
           />
         )}
       </View>
 
-      {/* Save Route Modal */}
-      <Modal
-        visible={saveModalVisible}
-        transparent={true}
-        animationType="fade"
-      >
+      <Modal visible={saveModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Save Route</Text>
-            <Text style={styles.modalSubtext}>Enter a custom name for your route:</Text>
-            <TextInput
-              style={styles.input}
-              value={customRouteName}
-              onChangeText={setCustomRouteName}
-              placeholder="Route name"
-              autoFocus
-            />
+            <Text style={styles.modalTitle}>Save route</Text>
+            <TextInput style={styles.input} value={customRouteName} onChangeText={setCustomRouteName} />
             <View style={styles.modalButtons}>
-              <View style={styles.modalBtn}>
-                <Button title="Cancel" onPress={() => setSaveModalVisible(false)} color="#888" />
-              </View>
-              <View style={styles.modalBtn}>
-                <Button title="Save" onPress={confirmSaveRoute} />
-              </View>
+              <Button title="Cancel" onPress={() => setSaveModalVisible(false)} color="#888" />
+              <Button
+                title="Save"
+                onPress={() => {
+                  if (origin && destination) {
+                    addRoute({
+                      name: customRouteName.trim() || 'Saved route',
+                      origin,
+                      destination,
+                      originName,
+                      destinationName,
+                    });
+                    setSaveModalVisible(false);
+                  }
+                }}
+              />
             </View>
           </View>
         </View>
@@ -255,102 +186,36 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  searchContainer: { position: 'absolute', top: 10, width: '100%', paddingHorizontal: 10, zIndex: 1000 },
+  hint: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    padding: 6,
+    borderRadius: 6,
+    fontSize: 12,
+    color: '#444',
+    marginTop: 4,
+    textAlign: 'center',
   },
-  searchContainer: {
-    position: 'absolute',
-    top: 10,
-    width: '100%',
-    paddingHorizontal: 10,
-    zIndex: 1000,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
+  headerButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' },
   headerButton: {
     backgroundColor: 'white',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginLeft: 8,
+    marginBottom: 4,
     fontSize: 12,
     fontWeight: 'bold',
     color: '#4A90E2',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
   },
-  mapContainer: {
-    flex: 1,
-    zIndex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    width: '90%',
-    zIndex: 1000,
-  },
-  loader: {
-    marginVertical: 10,
-  },
-  errorBox: {
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 8,
-  },
-  errorText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '80%',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  modalSubtext: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 20,
-    fontSize: 16,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalBtn: {
-    flex: 1,
-    marginHorizontal: 5,
-  },
+  mapContainer: { flex: 1, zIndex: 1 },
+  overlay: { position: 'absolute', bottom: 20, alignSelf: 'center', width: '90%', zIndex: 1000 },
+  errorBox: { backgroundColor: 'red', padding: 10, borderRadius: 8 },
+  errorText: { color: 'white', textAlign: 'center', fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { width: '80%', backgroundColor: 'white', borderRadius: 8, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 10, marginBottom: 16 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
 });

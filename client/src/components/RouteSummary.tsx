@@ -8,9 +8,16 @@ interface RouteSummaryProps {
   time: number; // in milliseconds
   instructions?: RouteInstruction[];
   onSaveRoute?: () => void;
+  schoolZonesAvoided?: boolean;
 }
 
-export default function RouteSummary({ distance, time, instructions, onSaveRoute }: RouteSummaryProps) {
+export default function RouteSummary({
+  distance,
+  time,
+  instructions,
+  onSaveRoute,
+  schoolZonesAvoided,
+}: RouteSummaryProps) {
   const [showSteps, setShowSteps] = useState(false);
 
   const formatDistance = (m: number) => {
@@ -37,6 +44,14 @@ export default function RouteSummary({ distance, time, instructions, onSaveRoute
         <Text style={styles.label}>Estimated Time:</Text>
         <Text style={styles.value}>{formatTime(time)}</Text>
       </View>
+      {schoolZonesAvoided !== undefined && (
+        <View style={styles.row}>
+          <Text style={styles.label}>Routing profile:</Text>
+          <Text style={[styles.value, schoolZonesAvoided ? styles.profileActive : styles.profileNormal]}>
+            {schoolZonesAvoided ? 'bike_school_zones' : 'bike'}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.buttonRow}>
         {onSaveRoute && (
@@ -92,6 +107,12 @@ const styles = StyleSheet.create({
   },
   value: {
     fontWeight: '500',
+  },
+  profileActive: {
+    color: '#c62828',
+  },
+  profileNormal: {
+    color: '#2e7d32',
   },
   buttonRow: {
     flexDirection: 'row',

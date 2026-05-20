@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 
 interface PreferencesState {
-  avoidSchoolZonesDuringPeakHours: boolean;
+  avoidSchoolZones: boolean;
   setAvoidSchoolZones: (avoid: boolean) => void;
+  developerMode: boolean;
+  setDeveloperMode: (on: boolean) => void;
 }
 
 export const usePreferences = create<PreferencesState>((set) => ({
-  avoidSchoolZonesDuringPeakHours: false,
-  setAvoidSchoolZones: (avoid) => set({ avoidSchoolZonesDuringPeakHours: avoid }),
+  avoidSchoolZones: false,
+  setAvoidSchoolZones: (avoid) => set({ avoidSchoolZones: avoid }),
+  developerMode: false,
+  setDeveloperMode: (on) => set({ developerMode: on }),
 }));
