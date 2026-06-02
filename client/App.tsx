@@ -6,20 +6,29 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import SavedRoutesScreen from './src/screens/SavedRoutesScreen';
 import ReportSchoolZoneScreen from './src/screens/ReportSchoolZoneScreen';
 import ReviewReportsScreen from './src/screens/ReviewReportsScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 import { useSchoolZoneReports } from './src/store/schoolZoneReports';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   const loadReports = useSchoolZoneReports((s) => s.load);
+  const startRemoteSync = useSchoolZoneReports((s) => s.startRemoteSync);
 
   useEffect(() => {
     loadReports();
-  }, [loadReports]);
+    return startRemoteSync();
+  }, [loadReports, startRemoteSync]);
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Map">
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ title: 'Login', headerShown: false }}
+        />
         <Stack.Screen 
           name="Map" 
           component={MapScreen} 
@@ -39,6 +48,11 @@ export default function App() {
           name="ReportSchoolZone"
           component={ReportSchoolZoneScreen}
           options={{ title: 'Report on map' }}
+        />
+        <Stack.Screen
+          name="AdminDashboard"
+          component={AdminDashboardScreen}
+          options={{ title: 'Admin dashboard' }}
         />
         <Stack.Screen
           name="ReviewReports"

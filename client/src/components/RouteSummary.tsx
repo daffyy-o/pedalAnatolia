@@ -8,6 +8,8 @@ interface RouteSummaryProps {
   time: number; // in milliseconds
   instructions?: RouteInstruction[];
   onSaveRoute?: () => void;
+  onRouteDone?: () => void;
+  routeDone?: boolean;
   schoolZonesAvoided?: boolean;
 }
 
@@ -16,6 +18,8 @@ export default function RouteSummary({
   time,
   instructions,
   onSaveRoute,
+  onRouteDone,
+  routeDone,
   schoolZonesAvoided,
 }: RouteSummaryProps) {
   const [showSteps, setShowSteps] = useState(false);
@@ -60,6 +64,15 @@ export default function RouteSummary({
             onPress={onSaveRoute}
           >
             <Text style={styles.saveButtonText}>⭐ Save Route</Text>
+          </TouchableOpacity>
+        )}
+        {onRouteDone && (
+          <TouchableOpacity
+            style={[styles.button, routeDone ? styles.doneButtonDisabled : styles.doneButton]}
+            onPress={onRouteDone}
+            disabled={routeDone}
+          >
+            <Text style={styles.doneButtonText}>{routeDone ? 'Route Added' : 'Route Done'}</Text>
           </TouchableOpacity>
         )}
         
@@ -118,6 +131,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
+    gap: 6,
   },
   button: {
     padding: 10,
@@ -127,11 +141,15 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#ffeb3b',
-    marginRight: 5,
+  },
+  doneButton: {
+    backgroundColor: '#2e7d32',
+  },
+  doneButtonDisabled: {
+    backgroundColor: '#9e9e9e',
   },
   stepsButton: {
     backgroundColor: '#f0f0f0',
-    marginLeft: 5,
   },
   saveButtonText: {
     color: '#333',
@@ -139,6 +157,10 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#4A90E2',
+    fontWeight: 'bold',
+  },
+  doneButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
 });

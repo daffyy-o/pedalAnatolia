@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { useSchoolZoneReports, SchoolZoneReport } from '../store/schoolZoneReports';
+import { useUsers } from '../store/users';
 
 function ReportCard({
   report,
@@ -36,12 +37,23 @@ function ReportCard({
 
 export default function ReviewReportsScreen() {
   const { reports, load, approveReport, rejectReport } = useSchoolZoneReports();
+  const { users, currentUserId } = useUsers();
+  const currentUser = users.find((u) => u.id === currentUserId);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const pending = reports.filter((r) => r.status === 'pending');
+
+  if (currentUser?.role !== 'admin') {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.header}>Admin only</Text>
+        <Text style={styles.empty}>Only admins can review school zone reports.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -70,6 +82,7 @@ export default function ReviewReportsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  centered: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 20 },
   content: { padding: 20 },
   header: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
   empty: { color: '#888' },

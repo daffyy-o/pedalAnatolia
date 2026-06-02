@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { MapContainer, TileLayer, Marker, Polygon, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import ReportPanel, { ReportMode } from '../components/ReportPanel';
@@ -97,15 +97,20 @@ export default function ReportSchoolZoneScreen({ navigation }: any) {
         </MapContainer>
       </View>
 
-      <ReportPanel
-        mode={mode}
-        onModeChange={changeMode}
-        note={note}
-        onNoteChange={setNote}
-        picked={mode === 'add' ? lat != null : zoneId != null}
-        onSubmit={onSubmit}
-        onCancel={() => navigation.goBack()}
-      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={20}
+      >
+        <ReportPanel
+          mode={mode}
+          onModeChange={changeMode}
+          note={note}
+          onNoteChange={setNote}
+          picked={mode === 'add' ? lat != null : zoneId != null}
+          onSubmit={onSubmit}
+          onCancel={() => navigation.goBack()}
+        />
+      </KeyboardAvoidingView>
     </View>
   );
 }

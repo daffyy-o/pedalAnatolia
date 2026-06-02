@@ -1,16 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, Switch, StyleSheet, Button } from 'react-native';
 import { usePreferences } from '../store/preferences';
-import { useSchoolZoneReports } from '../store/schoolZoneReports';
 
 export default function SettingsScreen({ navigation }: any) {
-  const { avoidSchoolZones, setAvoidSchoolZones, developerMode, setDeveloperMode } = usePreferences();
-  const loadReports = useSchoolZoneReports((s) => s.load);
-  const pendingCount = useSchoolZoneReports((s) => s.reports.filter((r) => r.status === 'pending').length);
-
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+  const { avoidSchoolZones, setAvoidSchoolZones } = usePreferences();
 
   return (
     <View style={styles.container}>
@@ -23,17 +16,6 @@ export default function SettingsScreen({ navigation }: any) {
 
       <Text style={styles.section}>Reports</Text>
       <Button title="Report a school zone" onPress={() => navigation.navigate('ReportSchoolZone')} />
-
-      <View style={[styles.settingRow, { marginTop: 24 }]}>
-        <Text style={styles.settingText}>Developer mode</Text>
-        <Switch value={developerMode} onValueChange={setDeveloperMode} />
-      </View>
-      {developerMode && (
-        <Button
-          title={`Review reports${pendingCount ? ` (${pendingCount} pending)` : ''}`}
-          onPress={() => navigation.navigate('ReviewReports')}
-        />
-      )}
     </View>
   );
 }

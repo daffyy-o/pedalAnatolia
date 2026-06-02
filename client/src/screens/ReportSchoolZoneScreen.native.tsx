@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import MapView, { Marker, Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import ReportPanel, { ReportMode } from '../components/ReportPanel';
 import { useSchoolZoneReports } from '../store/schoolZoneReports';
@@ -95,15 +95,20 @@ export default function ReportSchoolZoneScreen({ navigation }: any) {
         )}
       </MapView>
 
-      <ReportPanel
-        mode={mode}
-        onModeChange={changeMode}
-        note={note}
-        onNoteChange={setNote}
-        picked={mode === 'add' ? lat != null : zoneId != null}
-        onSubmit={onSubmit}
-        onCancel={() => navigation.goBack()}
-      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={20}
+      >
+        <ReportPanel
+          mode={mode}
+          onModeChange={changeMode}
+          note={note}
+          onNoteChange={setNote}
+          picked={mode === 'add' ? lat != null : zoneId != null}
+          onSubmit={onSubmit}
+          onCancel={() => navigation.goBack()}
+        />
+      </KeyboardAvoidingView>
     </View>
   );
 }
