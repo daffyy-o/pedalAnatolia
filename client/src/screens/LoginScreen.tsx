@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,37 +10,51 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ADMIN_PASSWORD, useUsers, UserRole } from '../store/users';
+import { useAuth } from '../store/auth';
 
-export default function LoginScreen({ navigation }: any) {
-  const { login, registerUser, loginError, clearLoginError } = useUsers();
+export default function LoginScreen() {
+  const {
+    login,
+    registerUser,
+    loginError,
+    authNotice,
+    loading,
+    clearLoginError,
+    clearAuthNotice,
+  } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [role, setRole] = useState<UserRole>('user');
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
 
   const title = useMemo(() => (mode === 'login' ? 'Login' : 'Create account'), [mode]);
 
-  const enterApp = () => navigation.replace('Map');
-
-  const submit = () => {
+  const submit = async () => {
     clearLoginError();
+    clearAuthNotice();
+
     if (mode === 'login') {
-      if (login(email, password)) enterApp();
+      await login(email, password);
       return;
     }
-    const ok = registerUser({
+
+    const result = await registerUser({
       name,
       age: Number(age),
       email,
       password,
-      role,
-      adminPassword,
     });
-    if (ok) enterApp();
+    if (result.requiresEmailConfirmation) {
+      setMode('login');
+      setPassword('');
+    }
+  };
+
+  const changeMode = (nextMode: 'login' | 'register') => {
+    setMode(nextMode);
+    clearLoginError();
+    clearAuthNotice();
   };
 
   return (
@@ -59,13 +74,13 @@ export default function LoginScreen({ navigation }: any) {
           <View style={styles.switchRow}>
             <TouchableOpacity
               style={[styles.switchButton, mode === 'login' && styles.switchActive]}
-              onPress={() => setMode('login')}
+              onPress={() => changeMode('login')}
             >
               <Text style={[styles.switchText, mode === 'login' && styles.switchTextActive]}>Login</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.switchButton, mode === 'register' && styles.switchActive]}
-              onPress={() => setMode('register')}
+              onPress={() => changeMode('register')}
             >
               <Text style={[styles.switchText, mode === 'register' && styles.switchTextActive]}>Register</Text>
             </TouchableOpacity>
@@ -81,20 +96,6 @@ export default function LoginScreen({ navigation }: any) {
                 onChangeText={setAge}
                 keyboardType="number-pad"
               />
-              <View style={styles.roleRow}>
-                <TouchableOpacity
-                  style={[styles.roleButton, role === 'user' && styles.roleActive]}
-                  onPress={() => setRole('user')}
-                >
-                  <Text style={[styles.roleText, role === 'user' && styles.roleTextActive]}>User</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.roleButton, role === 'admin' && styles.roleActive]}
-                  onPress={() => setRole('admin')}
-                >
-                  <Text style={[styles.roleText, role === 'admin' && styles.roleTextActive]}>Admin</Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
 
@@ -113,21 +114,18 @@ export default function LoginScreen({ navigation }: any) {
             onChangeText={setPassword}
             secureTextEntry
           />
-          {mode === 'register' && role === 'admin' && (
-            <TextInput
-              style={styles.input}
-              placeholder="Enter admin password"
-              value={adminPassword}
-              onChangeText={setAdminPassword}
-              secureTextEntry
-            />
-          )}
           {loginError ? <Text style={styles.error}>{loginError}</Text> : null}
-          {mode === 'register' && role === 'admin' && (
-            <Text style={styles.note}>Demo admin password: {ADMIN_PASSWORD}</Text>
-          )}
-          <TouchableOpacity style={styles.submit} onPress={submit}>
-            <Text style={styles.submitText}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
+          {authNotice ? <Text style={styles.notice}>{authNotice}</Text> : null}
+          <TouchableOpacity
+            style={[styles.submit, loading && styles.submitDisabled]}
+            onPress={submit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitText}>{mode === 'login' ? 'Login' : 'Create account'}</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -147,13 +145,9 @@ const styles = StyleSheet.create({
   switchText: { color: '#555', fontWeight: '700' },
   switchTextActive: { color: 'white' },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 12, marginBottom: 10, backgroundColor: '#fff' },
-  roleRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  roleButton: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, alignItems: 'center' },
-  roleActive: { borderColor: '#2e7d32', backgroundColor: '#e8f5e9' },
-  roleText: { color: '#555', fontWeight: '700' },
-  roleTextActive: { color: '#1b5e20' },
   error: { color: '#c62828', marginBottom: 10, fontWeight: '600' },
-  note: { color: '#666', marginBottom: 10, fontSize: 12 },
+  notice: { color: '#1b5e20', marginBottom: 10, fontWeight: '600' },
   submit: { backgroundColor: '#2e7d32', padding: 13, borderRadius: 6, alignItems: 'center' },
+  submitDisabled: { opacity: 0.65 },
   submitText: { color: 'white', fontWeight: '700', fontSize: 16 },
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchRoute, RouteCoordinate, RouteResponse } from '../lib/api';
 import { SchoolZoneFeature } from '../lib/schoolZones';
+import { RouteSnapshot } from '../types/routes';
 
 /** Start/end points + route line. One place so map screens stay simple. */
 export function useMapRouting(
@@ -12,10 +13,13 @@ export function useMapRouting(
   const [originName, setOriginName] = useState('Start');
   const [destinationName, setDestinationName] = useState('End');
   const [route, setRoute] = useState<RouteResponse | null>(null);
+  const [savedRouteId, setSavedRouteId] = useState<string | null>(null);
+  const [publishedRouteId, setPublishedRouteId] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mapRenderVersion, setMapRenderVersion] = useState(0);
   const reqId = useRef(0);
+  const skipNextRecalculate = useRef(false);
 
   const clearAll = useCallback(() => {
     reqId.current += 1;
@@ -25,6 +29,8 @@ export function useMapRouting(
     setOriginName('Start');
     setDestinationName('End');
     setRoute(null);
+    setSavedRouteId(null);
+    setPublishedRouteId(null);
     setErrorText(null);
     setLoading(false);
   }, []);
@@ -35,6 +41,8 @@ export function useMapRouting(
       setLoading(true);
       setErrorText(null);
       setRoute(null);
+      setSavedRouteId(null);
+      setPublishedRouteId(null);
       try {
         const response = await fetchRoute(start, end, avoidSchoolZones, schoolZonesForRouting);
         if (id !== reqId.current) return;
@@ -53,6 +61,10 @@ export function useMapRouting(
   // Settings toggled — redraw route (old line cleared first in calculateRoute)
   useEffect(() => {
     if (origin && destination) {
+      if (skipNextRecalculate.current) {
+        skipNextRecalculate.current = false;
+        return;
+      }
       calculateRoute(origin, destination);
     }
   }, [avoidSchoolZones, schoolZonesForRouting, origin, destination, calculateRoute]);
@@ -71,6 +83,8 @@ export function useMapRouting(
         setDestination(null);
         setDestinationName('End');
         setRoute(null);
+        setSavedRouteId(null);
+        setPublishedRouteId(null);
         setErrorText(null);
         setLoading(false);
         return;
@@ -96,6 +110,8 @@ export function useMapRouting(
         setDestination(null);
         setDestinationName('End');
         setRoute(null);
+        setSavedRouteId(null);
+        setPublishedRouteId(null);
         setErrorText(null);
         setLoading(false);
         return;
@@ -109,17 +125,22 @@ export function useMapRouting(
   );
 
   const loadSavedRoute = useCallback(
-    (saved: {
-      origin: RouteCoordinate;
-      destination: RouteCoordinate;
-      originName: string;
-      destinationName: string;
-    }) => {
+    (saved: RouteSnapshot) => {
+      skipNextRecalculate.current = Boolean(saved.route);
       setMapRenderVersion((v) => v + 1);
       setOrigin(saved.origin);
       setDestination(saved.destination);
       setOriginName(saved.originName);
       setDestinationName(saved.destinationName);
+      setSavedRouteId(saved.savedRouteId ?? null);
+      setPublishedRouteId(saved.publishedRouteId ?? null);
+      if (saved.route) {
+        reqId.current += 1;
+        setRoute(saved.route);
+        setErrorText(null);
+        setLoading(false);
+        return;
+      }
       calculateRoute(saved.origin, saved.destination);
     },
     [calculateRoute]
@@ -141,6 +162,8 @@ export function useMapRouting(
     originName,
     destinationName,
     route,
+    savedRouteId,
+    publishedRouteId,
     errorText,
     loading,
     hint,

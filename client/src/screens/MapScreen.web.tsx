@@ -11,7 +11,7 @@ import { getSchoolZoneFeatures, zoneToMapCoords } from '../lib/schoolZones';
 import { usePreferences } from '../store/preferences';
 import { useSchoolZoneReports } from '../store/schoolZoneReports';
 import { useSavedRoutes } from '../store/savedRoutes';
-import { useUsers, currentMonthKey, formatKm } from '../store/users';
+import { useAuth, currentMonthKey, formatKm } from '../store/auth';
 import { useLocationComments, LocationComment } from '../store/locationComments';
 import { getHiddenCounters } from '../lib/stats';
 import { RouteResponse } from '../lib/api';
@@ -68,8 +68,8 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
   const { avoidSchoolZones } = usePreferences();
   const overrides = useSchoolZoneReports((s) => s.overrides);
   const schoolZones = useMemo(() => getSchoolZoneFeatures(overrides), [overrides]);
-  const { addRoute } = useSavedRoutes();
-  const { users, currentUserId, addMonthlyDistance, logout } = useUsers();
+  const { addRoute, saving: routeSaving } = useSavedRoutes();
+  const { users, currentUserId, addMonthlyDistance, logout } = useAuth();
   const currentUser = users.find((u) => u.id === currentUserId);
   const comments = useLocationComments((s) => s.comments);
   const addComment = useLocationComments((s) => s.addComment);
@@ -80,6 +80,8 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
     originName,
     destinationName,
     route,
+    savedRouteId,
+    publishedRouteId,
     errorText,
     loading,
     hint,
@@ -172,6 +174,9 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
           <Text style={styles.headerButton} onPress={() => navigation.navigate('SavedRoutes')}>
             Saved
           </Text>
+          <Text style={styles.headerButton} onPress={() => navigation.navigate('RouteBoard')}>
+            Board
+          </Text>
           <Text
             style={[styles.headerButton, commentMode && styles.activeHeaderButton]}
             onPress={() => setCommentMode((value) => !value)}
@@ -188,10 +193,7 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
           )}
           <Text
             style={styles.headerButton}
-            onPress={() => {
-              logout();
-              navigation.replace('Login');
-            }}
+            onPress={() => void logout()}
           >
             Logout
           </Text>
@@ -268,11 +270,22 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
               setCustomRouteName(`From ${originName} to ${destinationName}`);
               setSaveModalVisible(true);
             }}
-            onRouteDone={() => {
+            onRouteDone={async () => {
               if (!route || routeDone) return;
-              addMonthlyDistance(route.distance);
-              setCompletedRouteKey(routeDoneKey);
-              Alert.alert('Route done', `${formatKm(route.distance)} added to your monthly distance.`);
+              try {
+                await addMonthlyDistance(route.distance, {
+                  savedRouteId,
+                  publishedRouteId,
+                  durationMs: route.time,
+                });
+                setCompletedRouteKey(routeDoneKey);
+                Alert.alert('Route done', `${formatKm(route.distance)} added to your monthly distance.`);
+              } catch (error) {
+                Alert.alert(
+                  'Could not record route',
+                  error instanceof Error ? error.message : 'Please try again.'
+                );
+              }
             }}
             routeDone={routeDone}
             schoolZonesAvoided={avoidSchoolZones}
@@ -288,17 +301,27 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
             <View style={styles.modalButtons}>
               <Button title="Cancel" onPress={() => setSaveModalVisible(false)} color="#888" />
               <Button
-                title="Save"
-                onPress={() => {
-                  if (origin && destination) {
-                    addRoute({
-                      name: customRouteName.trim() || 'Saved route',
-                      origin,
-                      destination,
-                      originName,
-                      destinationName,
-                    });
-                    setSaveModalVisible(false);
+                title={routeSaving ? 'Saving...' : 'Save'}
+                disabled={routeSaving}
+                onPress={async () => {
+                  if (origin && destination && route) {
+                    try {
+                      await addRoute({
+                        name: customRouteName.trim() || 'Saved route',
+                        origin,
+                        destination,
+                        originName,
+                        destinationName,
+                        route,
+                        routingProfile: avoidSchoolZones ? 'bike_school_zones' : 'bike',
+                      });
+                      setSaveModalVisible(false);
+                    } catch (error) {
+                      Alert.alert(
+                        'Could not save route',
+                        error instanceof Error ? error.message : 'Please try again.'
+                      );
+                    }
                   }
                 }}
               />

@@ -1,4 +1,4 @@
-import { AppUser } from '../store/users';
+import { AppUser } from '../store/auth';
 import { SchoolZoneFeature } from './schoolZones';
 import { LocationComment } from '../store/locationComments';
 

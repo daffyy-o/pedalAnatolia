@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { useSchoolZoneReports, SchoolZoneReport } from '../store/schoolZoneReports';
-import { useUsers } from '../store/users';
+import { useAuth } from '../store/auth';
 
 function ReportCard({
   report,
@@ -37,7 +37,7 @@ function ReportCard({
 
 export default function ReviewReportsScreen() {
   const { reports, load, approveReport, rejectReport } = useSchoolZoneReports();
-  const { users, currentUserId } = useUsers();
+  const { users, currentUserId } = useAuth();
   const currentUser = users.find((u) => u.id === currentUserId);
 
   useEffect(() => {
@@ -65,13 +65,27 @@ export default function ReviewReportsScreen() {
           <ReportCard
             key={r.id}
             report={r}
-            onApprove={() => {
-              approveReport(r.id);
-              Alert.alert('Done', r.type === 'add' ? 'Zone added on map.' : 'Zone removed from map.');
+            onApprove={async () => {
+              try {
+                await approveReport(r.id);
+                Alert.alert('Done', r.type === 'add' ? 'Zone added on map.' : 'Zone removed from map.');
+              } catch (error) {
+                Alert.alert(
+                  'Could not approve report',
+                  error instanceof Error ? error.message : 'Please try again.'
+                );
+              }
             }}
-            onReject={() => {
-              rejectReport(r.id);
-              Alert.alert('Done', 'Report rejected.');
+            onReject={async () => {
+              try {
+                await rejectReport(r.id);
+                Alert.alert('Done', 'Report rejected.');
+              } catch (error) {
+                Alert.alert(
+                  'Could not reject report',
+                  error instanceof Error ? error.message : 'Please try again.'
+                );
+              }
             }}
           />
         ))

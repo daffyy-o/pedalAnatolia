@@ -1,20 +1,60 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { getSchoolZoneFeatures } from '../lib/schoolZones';
 import { useLocationComments } from '../store/locationComments';
 import { useSchoolZoneReports } from '../store/schoolZoneReports';
-import { currentMonthKey, formatKm, useUsers } from '../store/users';
+import { formatKm, useAuth } from '../store/auth';
 import { getHiddenCounters } from '../lib/stats';
+import {
+  LeaderboardPeriod,
+  LeaderboardSortKey,
+  useAdminLeaderboard,
+} from '../store/adminLeaderboard';
+
+const PERIODS: Array<{ label: string; value: LeaderboardPeriod }> = [
+  { label: 'Daily', value: 'daily' },
+  { label: 'Monthly', value: 'monthly' },
+  { label: 'Yearly', value: 'yearly' },
+  { label: 'All time', value: 'all_time' },
+];
+
+const SORTS: Array<{ label: string; value: LeaderboardSortKey }> = [
+  { label: 'Distance', value: 'distanceMeters' },
+  { label: 'Rides', value: 'completedRides' },
+  { label: 'Saved', value: 'savedRoutesCount' },
+  { label: 'Published', value: 'publishedRoutesCount' },
+  { label: 'Rating', value: 'averageRating' },
+  { label: 'Name', value: 'name' },
+];
 
 export default function AdminDashboardScreen({ navigation }: any) {
-  const { users, currentUserId } = useUsers();
+  const { users, currentUserId, refreshUsers } = useAuth();
   const { reports, overrides } = useSchoolZoneReports();
   const comments = useLocationComments((s) => s.comments);
   const currentUser = users.find((u) => u.id === currentUserId);
   const schoolZones = useMemo(() => getSchoolZoneFeatures(overrides), [overrides]);
   const counters = getHiddenCounters(users, schoolZones, comments);
-  const month = currentMonthKey();
   const pendingReports = reports.filter((report) => report.status === 'pending');
+  const {
+    rows,
+    period,
+    sortKey,
+    loading,
+    error,
+    setPeriod,
+    setSortKey,
+    load,
+  } = useAdminLeaderboard();
+
+  useEffect(() => {
+    void refreshUsers();
+  }, [refreshUsers]);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      void load();
+    }
+  }, [currentUser?.role, load, period]);
 
   if (currentUser?.role !== 'admin') {
     return (
@@ -50,18 +90,45 @@ export default function AdminDashboardScreen({ navigation }: any) {
         <Text style={styles.reviewButtonText}>Review school zone reports</Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>All users</Text>
-      {users.map((user) => (
-        <View key={user.id} style={styles.rowCard}>
+      <Text style={styles.sectionTitle}>Cyclist leaderboard</Text>
+      <View style={styles.segmentRow}>
+        {PERIODS.map((item) => (
+          <TouchableOpacity
+            key={item.value}
+            style={[styles.segmentButton, period === item.value && styles.segmentActive]}
+            onPress={() => setPeriod(item.value)}
+          >
+            <Text style={[styles.segmentText, period === item.value && styles.segmentTextActive]}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.segmentRow}>
+        {SORTS.map((item) => (
+          <TouchableOpacity
+            key={item.value}
+            style={[styles.sortButton, sortKey === item.value && styles.segmentActive]}
+            onPress={() => setSortKey(item.value)}
+          >
+            <Text style={[styles.sortText, sortKey === item.value && styles.segmentTextActive]}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {loading ? <Text style={styles.muted}>Loading leaderboard...</Text> : null}
+      {rows.map((user, index) => (
+        <View key={user.userId} style={styles.rowCard}>
           <View style={styles.rowHeader}>
-            <Text style={styles.rowTitle}>{user.name}</Text>
+            <Text style={styles.rowTitle}>#{index + 1} {user.name}</Text>
             <Text style={[styles.roleBadge, user.role === 'admin' ? styles.adminBadge : styles.userBadge]}>
               {user.role}
             </Text>
           </View>
-          <Text style={styles.detail}>Age: {user.age}</Text>
           <Text style={styles.detail}>Email: {user.email}</Text>
-          <Text style={styles.detail}>This month: {formatKm(user.monthlyDistanceMeters[month] || 0)}</Text>
+          <Text style={styles.detail}>Distance: {formatKm(user.distanceMeters)}</Text>
+          <Text style={styles.detail}>Completed rides: {user.completedRides}</Text>
+          <Text style={styles.detail}>Saved routes: {user.savedRoutesCount}</Text>
+          <Text style={styles.detail}>Published routes: {user.publishedRoutesCount}</Text>
+          <Text style={styles.detail}>Average route rating: {user.averageRating.toFixed(2)}</Text>
         </View>
       ))}
 
@@ -110,6 +177,14 @@ const styles = StyleSheet.create({
   adminBadge: { backgroundColor: '#e3f2fd', color: '#1565c0' },
   userBadge: { backgroundColor: '#e8f5e9', color: '#2e7d32' },
   detail: { color: '#555', marginTop: 2 },
+  error: { color: '#c62828', marginBottom: 10, fontWeight: '700' },
+  segmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  segmentButton: { backgroundColor: '#eee', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 },
+  sortButton: { backgroundColor: '#eee', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 7 },
+  segmentActive: { backgroundColor: '#2e7d32' },
+  segmentText: { color: '#333', fontWeight: '700', fontSize: 12 },
+  sortText: { color: '#333', fontWeight: '700', fontSize: 11 },
+  segmentTextActive: { color: '#fff' },
   zoneRow: {
     backgroundColor: '#fff',
     borderRadius: 8,

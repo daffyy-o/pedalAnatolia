@@ -186,8 +186,13 @@ export const useSchoolZoneReports = create<ReportsState>((set, get) => ({
         const remote = await readRemoteReports();
         if (remote) {
           const remoteIds = new Set(remote.reports.map((report) => report.id));
-          const localOnlyReports = localData.reports.filter((report) => !remoteIds.has(report.id));
-          const reports = mergeReports(localData.reports, remote.reports);
+          const localPendingReports = localData.reports.filter(
+            (report) => report.status === 'pending'
+          );
+          const localOnlyReports = localPendingReports.filter(
+            (report) => !remoteIds.has(report.id)
+          );
+          const reports = mergeReports(localPendingReports, remote.reports);
 
           if (localOnlyReports.length > 0) {
             try {
@@ -251,34 +256,33 @@ export const useSchoolZoneReports = create<ReportsState>((set, get) => ({
     const report = get().reports.find((r) => r.id === id);
     if (!report || report.status !== 'pending') return;
 
+    if (supabase) {
+      const { error } = await supabase.from(TABLE_NAME).update({ status: 'approved' }).eq('id', id);
+      if (error) throw error;
+    }
+
     const reports = get().reports.map((r) =>
       r.id === id ? { ...r, status: 'approved' as const } : r
     );
     const overrides = buildOverrides(reports);
     set({ reports, overrides });
     await save(reports, overrides);
-
-    if (supabase) {
-      const { error } = await supabase.from(TABLE_NAME).update({ status: 'approved' }).eq('id', id);
-      if (error) {
-        console.warn('Supabase approval failed, approval is saved locally.', error);
-      }
-    }
   },
 
   rejectReport: async (id) => {
+    const report = get().reports.find((r) => r.id === id);
+    if (!report || report.status !== 'pending') return;
+
+    if (supabase) {
+      const { error } = await supabase.from(TABLE_NAME).update({ status: 'rejected' }).eq('id', id);
+      if (error) throw error;
+    }
+
     const reports = get().reports.map((r) =>
       r.id === id ? { ...r, status: 'rejected' as const } : r
     );
     const overrides = buildOverrides(reports);
     set({ reports, overrides });
     await save(reports, overrides);
-
-    if (supabase) {
-      const { error } = await supabase.from(TABLE_NAME).update({ status: 'rejected' }).eq('id', id);
-      if (error) {
-        console.warn('Supabase rejection failed, rejection is saved locally.', error);
-      }
-    }
   },
 }));
