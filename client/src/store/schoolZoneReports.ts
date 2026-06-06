@@ -150,16 +150,55 @@ async function readRemoteReports() {
   return { reports, overrides: buildOverrides(reports) };
 }
 
+function mergeReports(localReports: SchoolZoneReport[], remoteReports: SchoolZoneReport[]) {
+  const reportsById = new Map<string, SchoolZoneReport>();
+
+  for (const report of localReports) {
+    reportsById.set(report.id, report);
+  }
+
+  for (const report of remoteReports) {
+    reportsById.set(report.id, report);
+  }
+
+  return [...reportsById.values()].sort((a, b) => a.createdAt - b.createdAt);
+}
+
+async function backfillRemoteReports(reports: SchoolZoneReport[]) {
+  if (!supabase || reports.length === 0) return;
+
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .upsert(reports.map(reportToRow), { onConflict: 'id', ignoreDuplicates: true });
+
+  if (error) throw error;
+}
+
 export const useSchoolZoneReports = create<ReportsState>((set, get) => ({
   reports: [],
   overrides: { added: [], removedIds: [] },
 
   load: async () => {
-    let data = await readStorage();
+    const localData = await readStorage();
+    let data = localData;
     if (isSupabaseConfigured) {
       try {
         const remote = await readRemoteReports();
-        if (remote) data = remote;
+        if (remote) {
+          const remoteIds = new Set(remote.reports.map((report) => report.id));
+          const localOnlyReports = localData.reports.filter((report) => !remoteIds.has(report.id));
+          const reports = mergeReports(localData.reports, remote.reports);
+
+          if (localOnlyReports.length > 0) {
+            try {
+              await backfillRemoteReports(localOnlyReports);
+            } catch (error) {
+              console.warn('Supabase backfill failed, keeping local school-zone cache.', error);
+            }
+          }
+
+          data = { reports, overrides: buildOverrides(reports) };
+        }
       } catch (error) {
         console.warn('Supabase load failed, using local school-zone cache.', error);
       }

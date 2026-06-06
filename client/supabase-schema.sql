@@ -11,6 +11,8 @@ create table if not exists school_zone_reports (
 
 alter table school_zone_reports enable row level security;
 
+grant select, insert, update on table school_zone_reports to anon, authenticated;
+
 drop policy if exists "Anyone can read school zone reports" on school_zone_reports;
 create policy "Anyone can read school zone reports"
 on school_zone_reports for select
