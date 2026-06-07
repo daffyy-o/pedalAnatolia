@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Platform } from 'react-native';
 import { RouteResponse } from '../lib/api';
+import { Colors, Spacing, BorderRadius } from '../lib/theme';
 
 export default function RoutePreviewMap({ route }: { route: RouteResponse }) {
   const mapRef = useRef<MapView>(null);
@@ -42,19 +43,21 @@ export default function RoutePreviewMap({ route }: { route: RouteResponse }) {
       pitchEnabled={false}
       rotateEnabled={false}
     >
-      <Marker coordinate={coordinates[0]} title="Start" pinColor="green" />
-      <Marker coordinate={coordinates[coordinates.length - 1]} title="End" pinColor="red" />
-      <Polyline coordinates={coordinates} strokeColor="#4A90E2" strokeWidth={4} />
+      <Marker coordinate={coordinates[0]} title="Start" pinColor={Colors.startMarker} />
+      <Marker coordinate={coordinates[coordinates.length - 1]} title="End" pinColor={Colors.endMarker} />
+      <Polyline coordinates={coordinates} strokeColor={Colors.routeLine} strokeWidth={5} />
     </MapView>
   );
 }
 
 const styles = StyleSheet.create({
   map: {
-    height: 260,
-    borderRadius: 8,
+    height: 240,
+    borderRadius: BorderRadius.md,
     overflow: 'hidden',
-    marginTop: 16,
-    backgroundColor: '#e0e0e0',
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.darkSurface,
+    borderWidth: 1,
+    borderColor: 'rgba(249,16,102,0.25)',
   },
 });

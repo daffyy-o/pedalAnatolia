@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert } from '../components/CustomAlert';
 import { MapContainer, TileLayer, Marker, Polygon, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import ReportPanel, { ReportMode } from '../components/ReportPanel';
 import { useSchoolZoneReports } from '../store/schoolZoneReports';
 import { getSchoolZoneFeatures } from '../lib/schoolZones';
+import { Colors } from '../lib/theme';
 
 function MapClicks({ mode, onAdd }: { mode: ReportMode; onAdd: (lat: number, lon: number) => void }) {
   useMapEvents({
@@ -84,8 +86,9 @@ export default function ReportSchoolZoneScreen({ navigation }: any) {
                 key={String(zone.id)}
                 positions={positions}
                 pathOptions={{
-                  color: selected ? '#FF8C00' : '#c80000',
-                  fillOpacity: selected ? 0.5 : 0.25,
+                  color: selected ? Colors.accent : Colors.schoolZoneStroke,
+                  fillColor: selected ? Colors.accent : Colors.primary,
+                  fillOpacity: selected ? 0.45 : 0.15,
                 }}
                 eventHandlers={{
                   click: () => mode === 'remove' && setZoneId(String(zone.id)),

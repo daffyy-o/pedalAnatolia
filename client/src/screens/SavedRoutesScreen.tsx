@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
-  Alert,
-  Button,
   FlatList,
   Modal,
   StyleSheet,
@@ -11,25 +10,87 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Alert } from '../components/CustomAlert';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   savedRouteToSnapshot,
   SavedRoute,
   useSavedRoutes,
 } from '../store/savedRoutes';
 import { formatDistance, formatDuration } from '../types/routes';
+import { Colors, Spacing, BorderRadius, Typography, Shadows, Gradients, Glass } from '../lib/theme';
+
+function AnimatedRouteCard({
+  item,
+  index,
+  onPress,
+  onRename,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: {
+  item: SavedRoute;
+  index: number;
+  onPress: () => void;
+  onRename: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onDelete: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 400, delay: index * 60, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, speed: 14, bounciness: 2, useNativeDriver: true, delay: index * 60 } as any),
+    ]).start();
+  }, [index, opacity, translateY]);
+
+  return (
+    <Animated.View style={[styles.card, { opacity, transform: [{ translateY }] }]}>
+      {/* Left accent strip */}
+      <View style={[styles.cardAccent, item.publishedRouteId ? styles.cardAccentPublished : styles.cardAccentUnpublished]} />
+
+      <TouchableOpacity style={styles.cardContent} onPress={onPress} activeOpacity={0.7}>
+        <Text style={styles.routeName}>{item.name}</Text>
+        <Text style={styles.routeLine}>
+          {item.originName} → {item.destinationName}
+        </Text>
+        <Text style={styles.routeMetric}>
+          {formatDistance(item.route.distance)} · {formatDuration(item.route.time)}
+        </Text>
+        {item.publishedRouteId ? (
+          <View style={styles.publishedBadge}>
+            <Text style={styles.publishedBadgeText}>📋 On Route Board</Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={onRename}>
+          <Text style={styles.actionBtnText}>✏ Edit</Text>
+        </TouchableOpacity>
+        {item.publishedRouteId ? (
+          <TouchableOpacity style={[styles.actionBtn, styles.unpublishBtn]} onPress={onUnpublish}>
+            <Text style={styles.actionBtnText}>↩ Unpublish</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.actionBtn, styles.publishBtn]} onPress={onPublish}>
+            <Text style={[styles.actionBtnText, styles.publishBtnText]}>↑ Publish</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={onDelete}>
+          <Text style={[styles.actionBtnText, styles.deleteBtnText]}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function SavedRoutesScreen({ navigation }: any) {
-  const {
-    routes,
-    loading,
-    saving,
-    error,
-    loadRoutes,
-    removeRoute,
-    renameRoute,
-    publishRoute,
-    unpublishRoute,
-  } = useSavedRoutes();
+  const { routes, loading, saving, error, loadRoutes, removeRoute, renameRoute, publishRoute, unpublishRoute } =
+    useSavedRoutes();
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [publishModalVisible, setPublishModalVisible] = useState(false);
   const [editingRoute, setEditingRoute] = useState<SavedRoute | null>(null);
@@ -37,9 +98,7 @@ export default function SavedRoutesScreen({ navigation }: any) {
   const [publishTitle, setPublishTitle] = useState('');
   const [publishDescription, setPublishDescription] = useState('');
 
-  useEffect(() => {
-    void loadRoutes();
-  }, [loadRoutes]);
+  useEffect(() => { void loadRoutes(); }, [loadRoutes]);
 
   const openRenameModal = (route: SavedRoute) => {
     setEditingRoute(route);
@@ -60,8 +119,8 @@ export default function SavedRoutesScreen({ navigation }: any) {
       await renameRoute(editingRoute.id, newName.trim());
       setRenameModalVisible(false);
       setEditingRoute(null);
-    } catch (renameError) {
-      Alert.alert('Could not rename route', renameError instanceof Error ? renameError.message : 'Please try again.');
+    } catch (err) {
+      Alert.alert('Could not rename route', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -76,8 +135,8 @@ export default function SavedRoutesScreen({ navigation }: any) {
       setPublishModalVisible(false);
       setEditingRoute(null);
       navigation.navigate('RouteDetail', { routeId: publishedRouteId });
-    } catch (publishError) {
-      Alert.alert('Could not publish route', publishError instanceof Error ? publishError.message : 'Please try again.');
+    } catch (err) {
+      Alert.alert('Could not publish route', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -88,11 +147,8 @@ export default function SavedRoutesScreen({ navigation }: any) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          try {
-            await removeRoute(route.id);
-          } catch (deleteError) {
-            Alert.alert('Could not delete route', deleteError instanceof Error ? deleteError.message : 'Please try again.');
-          }
+          try { await removeRoute(route.id); }
+          catch (err) { Alert.alert('Could not delete route', err instanceof Error ? err.message : 'Please try again.'); }
         },
       },
     ]);
@@ -105,146 +161,227 @@ export default function SavedRoutesScreen({ navigation }: any) {
         text: 'Unpublish',
         style: 'destructive',
         onPress: async () => {
-          try {
-            await unpublishRoute(route.id);
-          } catch (unpublishError) {
-            Alert.alert(
-              'Could not unpublish route',
-              unpublishError instanceof Error ? unpublishError.message : 'Please try again.'
-            );
-          }
+          try { await unpublishRoute(route.id); }
+          catch (err) { Alert.alert('Could not unpublish route', err instanceof Error ? err.message : 'Please try again.'); }
         },
       },
     ]);
   };
 
-  const renderItem = ({ item }: { item: SavedRoute }) => (
-    <View style={styles.itemContainer}>
-      <TouchableOpacity
-        style={styles.itemContent}
-        onPress={() => navigation.navigate('Map', { loadRoute: savedRouteToSnapshot(item) })}
-      >
-        <Text style={styles.routeName}>{item.name}</Text>
-        <Text style={styles.routeDetails}>
-          {item.originName} -> {item.destinationName}
-        </Text>
-        <Text style={styles.metric}>
-          {formatDistance(item.route.distance)} • {formatDuration(item.route.time)}
-        </Text>
-        {item.publishedRouteId ? <Text style={styles.published}>Published on Route Board</Text> : null}
-      </TouchableOpacity>
-
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.editButton} onPress={() => openRenameModal(item)}>
-          <Text style={styles.buttonText}>Edit</Text>
-        </TouchableOpacity>
-        {item.publishedRouteId ? (
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => confirmUnpublish(item)}>
-            <Text style={styles.buttonText}>Unpublish</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => openPublishModal(item)}>
-            <Text style={styles.buttonText}>Publish</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.deleteButton} onPress={() => confirmDelete(item)}>
-          <Text style={styles.buttonTextWhite}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={['#0e1428', '#1a1f38']} style={styles.screen}>
+      {/* Top bar */}
       <View style={styles.topBar}>
-        <Button title="Route Board" onPress={() => navigation.navigate('RouteBoard')} />
-        <Button title="Refresh" onPress={() => void loadRoutes()} />
+        <TouchableOpacity style={styles.topBarBtn} onPress={() => navigation.navigate('RouteBoard')}>
+          <Text style={styles.topBarBtnText}>📋 Route Board</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.topBarBtn} onPress={() => void loadRoutes()}>
+          <Text style={styles.topBarBtnText}>↻ Refresh</Text>
+        </TouchableOpacity>
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
       {loading ? (
-        <ActivityIndicator size="large" color="#2e7d32" style={styles.loader} />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
       ) : routes.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No saved routes yet.</Text>
-          <Text style={styles.emptySubtext}>New saved routes are stored in your Supabase account.</Text>
+        <View style={styles.centered}>
+          <Text style={styles.emptyIcon}>🚴</Text>
+          <Text style={styles.emptyTitle}>No saved routes yet</Text>
+          <Text style={styles.emptySubtitle}>Plan a route on the map and save it to see it here.</Text>
         </View>
       ) : (
         <FlatList
           data={routes}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
+          renderItem={({ item, index }) => (
+            <AnimatedRouteCard
+              item={item}
+              index={index}
+              onPress={() => navigation.navigate('Map', { loadRoute: savedRouteToSnapshot(item) })}
+              onRename={() => openRenameModal(item)}
+              onPublish={() => openPublishModal(item)}
+              onUnpublish={() => confirmUnpublish(item)}
+              onDelete={() => confirmDelete(item)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
         />
       )}
 
+      {/* Rename Modal */}
       <Modal visible={renameModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Rename Route</Text>
-            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="Route name" />
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={() => setRenameModalVisible(false)} color="#888" />
-              <Button title={saving ? 'Saving...' : 'Save'} onPress={handleRename} disabled={saving} />
+            <TextInput
+              style={styles.modalInput}
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Route name"
+              placeholderTextColor={Colors.mutedText}
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRenameModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleRename} disabled={saving}>
+                <LinearGradient colors={Gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.modalAction}>
+                  <Text style={styles.modalActionText}>{saving ? 'Saving…' : 'Save'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
+      {/* Publish Modal */}
       <Modal visible={publishModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Publish Route</Text>
-            <TextInput style={styles.input} value={publishTitle} onChangeText={setPublishTitle} placeholder="Title" />
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Publish to Route Board</Text>
             <TextInput
-              style={[styles.input, styles.descriptionInput]}
+              style={styles.modalInput}
+              value={publishTitle}
+              onChangeText={setPublishTitle}
+              placeholder="Route title (required)"
+              placeholderTextColor={Colors.mutedText}
+            />
+            <TextInput
+              style={[styles.modalInput, styles.descInput]}
               value={publishDescription}
               onChangeText={setPublishDescription}
               placeholder="Description (optional)"
+              placeholderTextColor={Colors.mutedText}
               multiline
             />
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={() => setPublishModalVisible(false)} color="#888" />
-              <Button title={saving ? 'Publishing...' : 'Publish'} onPress={handlePublish} disabled={saving} />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setPublishModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handlePublish} disabled={saving}>
+                <LinearGradient colors={Gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.modalAction}>
+                  <Text style={styles.modalActionText}>{saving ? 'Publishing…' : 'Publish'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, backgroundColor: '#fff' },
-  listContainer: { padding: 15 },
-  loader: { marginTop: 30 },
-  error: { margin: 12, color: '#c62828', fontWeight: '700' },
-  itemContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+  screen:      { flex: 1 },
+  listContent: { padding: Spacing.lg },
+
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  itemContent: { marginBottom: 12 },
-  routeName: { fontSize: 16, fontWeight: 'bold', marginBottom: 4, color: '#333' },
-  routeDetails: { fontSize: 12, color: '#666' },
-  metric: { color: '#2e7d32', marginTop: 5, fontWeight: '600' },
-  published: { color: '#1565c0', marginTop: 5, fontSize: 12, fontWeight: '700' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  editButton: { backgroundColor: '#eee', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  secondaryButton: { backgroundColor: '#e3f2fd', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  deleteButton: { backgroundColor: '#e74c3c', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  buttonText: { color: '#333', fontWeight: '600', fontSize: 12 },
-  buttonTextWhite: { color: 'white', fontWeight: '600', fontSize: 12 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  emptyText: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 10 },
-  emptySubtext: { fontSize: 14, color: '#666', textAlign: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { width: '84%', backgroundColor: 'white', borderRadius: 8, padding: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 6, padding: 10, fontSize: 16, marginBottom: 12 },
-  descriptionInput: { minHeight: 80, textAlignVertical: 'top' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  topBarBtn: {
+    backgroundColor: Glass.background,
+    borderWidth: Glass.borderWidth,
+    borderColor: Glass.border,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  topBarBtnText: { ...Typography.bodyBold, color: Colors.white },
+
+  errorText: { color: Colors.error, margin: Spacing.md, fontWeight: '700' },
+
+  centered:     { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xxxl },
+  emptyIcon:    { fontSize: 52, marginBottom: Spacing.md },
+  emptyTitle:   { ...Typography.h3, marginBottom: Spacing.sm },
+  emptySubtitle:{ ...Typography.muted, textAlign: 'center' },
+
+  // Card
+  card: {
+    backgroundColor: Glass.background,
+    borderWidth: Glass.borderWidth,
+    borderColor: Glass.border,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    flexDirection: 'column',
+    ...Shadows.sm,
+  },
+  cardAccent:           { height: 3 },
+  cardAccentPublished:  { backgroundColor: Colors.primary },
+  cardAccentUnpublished:{ backgroundColor: 'rgba(139,143,163,0.4)' },
+
+  cardContent:   { padding: Spacing.lg, paddingBottom: Spacing.sm },
+  routeName:     { ...Typography.h4, marginBottom: 4 },
+  routeLine:     { ...Typography.muted, marginBottom: 4 },
+  routeMetric:   { ...Typography.bodyBold, color: Colors.accent },
+  publishedBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(249,16,102,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,16,102,0.3)',
+    borderRadius: BorderRadius.pill,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginTop: Spacing.sm,
+  },
+  publishedBadgeText: { fontSize: 11, color: Colors.primary, fontWeight: '700' },
+
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    paddingTop: 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    marginTop: Spacing.sm,
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  publishBtn:     { borderColor: 'rgba(255,133,82,0.4)', backgroundColor: 'rgba(255,133,82,0.1)' },
+  unpublishBtn:   { borderColor: 'rgba(139,143,163,0.3)' },
+  deleteBtn:      { borderColor: 'rgba(239,68,68,0.35)', backgroundColor: 'rgba(239,68,68,0.08)', marginLeft: 'auto' },
+  actionBtnText:  { ...Typography.label, color: Colors.mutedText, fontWeight: '600' },
+  publishBtnText: { color: Colors.accent },
+  deleteBtnText:  { color: Colors.error },
+
+  // Modals
+  modalOverlay:   { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center' },
+  modalBox: {
+    width: '88%',
+    backgroundColor: Colors.darkSurface,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    ...Shadows.lg,
+  },
+  modalTitle:  { ...Typography.h3, marginBottom: Spacing.lg },
+  modalInput: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    color: Colors.white,
+    fontSize: 15,
+    marginBottom: Spacing.md,
+  },
+  descInput:      { minHeight: 80, textAlignVertical: 'top' },
+  modalBtns:      { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.sm },
+  modalCancel:    { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm + 2, justifyContent: 'center' },
+  modalCancelText:{ color: Colors.mutedText, fontWeight: '600' },
+  modalAction:    { borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm + 2 },
+  modalActionText:{ color: Colors.white, fontWeight: '700', fontSize: 14 },
 });

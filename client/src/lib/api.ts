@@ -1,12 +1,38 @@
 import axios from 'axios';
 
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { SchoolZoneFeature } from './schoolZones';
 
 // Set EXPO_PUBLIC_GRAPHHOPPER_BASE_URL in client/.env (see .env.example)
-const BASE_URL =
-  process.env.EXPO_PUBLIC_GRAPHHOPPER_BASE_URL ||
-  (Platform.OS === 'web' ? 'http://localhost:8989' : '');
+const getBaseUrl = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_GRAPHHOPPER_BASE_URL;
+  if (envUrl && envUrl !== 'auto') {
+    return envUrl;
+  }
+
+  if (Platform.OS === 'web') {
+    return 'http://localhost:8989';
+  }
+
+  try {
+    const scriptURL = NativeModules.SourceCode?.scriptURL;
+    if (scriptURL) {
+      const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+      if (match && match[1]) {
+        const url = `http://${match[1]}:8989`;
+        console.log('[PedalAnatolia] Dynamically resolved GraphHopper URL from Metro bundle:', url);
+        return url;
+      }
+    }
+  } catch (e) {
+    console.warn('[PedalAnatolia] Failed to parse scriptURL for auto GraphHopper URL:', e);
+  }
+
+  // Fallback to the current PC IP if dynamic parsing fails
+  return 'http://10.2.122.52:8989';
+};
+
+const BASE_URL = getBaseUrl();
 
 export interface RouteCoordinate {
   lat: number;

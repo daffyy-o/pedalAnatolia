@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import { Alert } from '../components/CustomAlert';
 import MapView, { Marker, Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import ReportPanel, { ReportMode } from '../components/ReportPanel';
 import { useSchoolZoneReports } from '../store/schoolZoneReports';
 import { getSchoolZoneFeatures, zoneToMapCoords } from '../lib/schoolZones';
+import { Colors } from '../lib/theme';
 
 const START = {
   latitude: 39.92,
@@ -82,8 +84,8 @@ export default function ReportSchoolZoneScreen({ navigation }: any) {
             <Polygon
               key={String(zone.id)}
               coordinates={zoneToMapCoords(zone)}
-              fillColor={selected ? 'rgba(255, 140, 0, 0.5)' : 'rgba(255, 0, 0, 0.25)'}
-              strokeColor={selected ? '#FF8C00' : '#c80000'}
+              fillColor={selected ? 'rgba(255,133,82,0.45)' : Colors.schoolZone}
+              strokeColor={selected ? Colors.accent : Colors.schoolZoneStroke}
               strokeWidth={selected ? 4 : 2}
               tappable={mode === 'remove'}
               onPress={() => mode === 'remove' && setZoneId(String(zone.id))}
@@ -91,7 +93,7 @@ export default function ReportSchoolZoneScreen({ navigation }: any) {
           );
         })}
         {lat != null && lon != null && (
-          <Marker coordinate={{ latitude: lat, longitude: lon }} pinColor="#4A90E2" />
+          <Marker coordinate={{ latitude: lat, longitude: lon }} pinColor={Colors.primary} />
         )}
       </MapView>
 

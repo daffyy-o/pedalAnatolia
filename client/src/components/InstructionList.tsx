@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RouteInstruction } from '../lib/api';
+import { Colors, Spacing, BorderRadius, Typography, Gradients } from '../lib/theme';
 
 interface InstructionListProps {
   instructions: RouteInstruction[];
@@ -14,9 +16,19 @@ export default function InstructionList({ instructions }: InstructionListProps) 
 
   const renderItem = ({ item, index }: { item: RouteInstruction; index: number }) => (
     <View style={styles.itemContainer}>
-      <View style={styles.stepCircle}>
+      {/* Step circle */}
+      <LinearGradient
+        colors={Gradients.primary}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.stepCircle}
+      >
         <Text style={styles.stepNumber}>{index + 1}</Text>
-      </View>
+      </LinearGradient>
+
+      {/* Connecting line (except last) */}
+      {index < instructions.length - 1 && <View style={styles.connector} />}
+
       <View style={styles.textContainer}>
         <Text style={styles.instructionText}>{item.text}</Text>
         <Text style={styles.distanceText}>{formatDistance(item.distance)}</Text>
@@ -31,49 +43,50 @@ export default function InstructionList({ instructions }: InstructionListProps) 
       renderItem={renderItem}
       style={styles.list}
       contentContainerStyle={styles.listContent}
+      scrollEnabled={false}
     />
   );
 }
 
 const styles = StyleSheet.create({
   list: {
-    maxHeight: 250,
-    marginTop: 10,
+    maxHeight: 260,
+    marginTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  listContent: {
-    paddingVertical: 10,
-  },
+  listContent: { paddingVertical: Spacing.sm },
+
   itemContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'center',
+    marginBottom: Spacing.md,
+    alignItems: 'flex-start',
+    position: 'relative',
   },
+
   stepCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#4A90E2',
+    width: 26,
+    height: 26,
+    borderRadius: BorderRadius.pill,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: Spacing.md,
+    flexShrink: 0,
+    zIndex: 2,
   },
-  stepNumber: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  stepNumber: { color: Colors.white, fontSize: 11, fontWeight: '800' },
+
+  connector: {
+    position: 'absolute',
+    left: 12,
+    top: 26,
+    width: 2,
+    height: Spacing.xl + 2,
+    backgroundColor: 'rgba(249,16,102,0.25)',
+    zIndex: 1,
   },
-  textContainer: {
-    flex: 1,
-  },
-  instructionText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  distanceText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
+
+  textContainer: { flex: 1, paddingTop: 3 },
+  instructionText: { ...Typography.body, color: Colors.white, lineHeight: 20 },
+  distanceText:    { ...Typography.caption, marginTop: 2 },
 });

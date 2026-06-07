@@ -142,7 +142,7 @@ export function publishedRouteToSnapshot(route: PublishedRoute): RouteSnapshot {
     destinationName: route.destinationName,
     route: route.route,
     routingProfile: route.routingProfile,
-    savedRouteId: route.savedRouteId,
+    savedRouteId: null, // Do not propagate owner's savedRouteId to riders
     publishedRouteId: route.id,
   };
 }
@@ -242,11 +242,12 @@ export const useRouteBoard = create<RouteBoardState>((set, get) => ({
 
     if (currentUserId) {
       const [{ data: ratings }, { count: completions }] = await Promise.all([
-        supabase.from('route_ratings').select('rating').eq('published_route_id', id).maybeSingle(),
+        supabase.from('route_ratings').select('rating').eq('published_route_id', id).eq('user_id', currentUserId).maybeSingle(),
         supabase
           .from('route_completions')
           .select('id', { count: 'exact', head: true })
-          .eq('published_route_id', id),
+          .eq('published_route_id', id)
+          .eq('user_id', currentUserId),
       ]);
 
       myRating = ratings?.rating ?? null;
@@ -266,18 +267,54 @@ export const useRouteBoard = create<RouteBoardState>((set, get) => ({
     if (rating < 1 || rating > 5) throw new Error('Rating must be between 1 and 5.');
 
     set({ ratingLoading: true, error: '' });
-    const { error } = await supabase
-      .from('route_ratings')
-      .upsert({ published_route_id: routeId, rating }, { onConflict: 'published_route_id,user_id' });
 
-    set({ ratingLoading: false });
-    if (error) {
-      set({ error: error.message });
-      throw error;
+    try {
+      const sessionRes = await supabase.auth.getSession();
+      const currentUserId = sessionRes.data.session?.user?.id;
+      if (!currentUserId) throw new Error('Authentication required.');
+
+      // Check if rating already exists for this user to avoid permission issues
+      const { data: existing, error: fetchError } = await supabase
+        .from('route_ratings')
+        .select('rating')
+        .eq('published_route_id', routeId)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+
+      if (fetchError) {
+        set({ ratingLoading: false, error: fetchError.message });
+        throw new Error(fetchError.message);
+      }
+
+      let error;
+      if (existing) {
+        // Perform a clean update on rating column only for this specific user
+        const res = await supabase
+          .from('route_ratings')
+          .update({ rating })
+          .eq('published_route_id', routeId)
+          .eq('user_id', currentUserId);
+        error = res.error;
+      } else {
+        // Perform a clean insert
+        const res = await supabase
+          .from('route_ratings')
+          .insert({ published_route_id: routeId, rating, user_id: currentUserId });
+        error = res.error;
+      }
+
+      set({ ratingLoading: false });
+      if (error) {
+        set({ error: error.message });
+        throw new Error(error.message);
+      }
+
+      set({ myRating: rating });
+      await get().loadRoutes(true);
+    } catch (err: any) {
+      set({ ratingLoading: false });
+      throw err;
     }
-
-    set({ myRating: rating });
-    await get().loadRoutes(true);
   },
 
   deleteRoute: async (routeId) => {
@@ -287,7 +324,7 @@ export const useRouteBoard = create<RouteBoardState>((set, get) => ({
     const { error } = await supabase.from('published_routes').delete().eq('id', routeId);
     if (error) {
       set({ loading: false, error: error.message });
-      throw error;
+      throw new Error(error.message);
     }
 
     set((state) => ({

@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert } from '../components/CustomAlert';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSchoolZoneReports, SchoolZoneReport } from '../store/schoolZoneReports';
 import { useAuth } from '../store/auth';
+import { Colors, Spacing, BorderRadius, Typography, Shadows, Gradients, Glass } from '../lib/theme';
 
 function ReportCard({
   report,
@@ -12,23 +15,31 @@ function ReportCard({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const label = report.type === 'add' ? 'Add school' : 'Remove zone';
-  const where =
-    report.type === 'add'
-      ? `at ${report.lat?.toFixed(4)}, ${report.lon?.toFixed(4)}`
-      : `zone ${report.zoneId}`;
+  const isAdd = report.type === 'add';
+  const where = isAdd
+    ? `${report.lat?.toFixed(4)}, ${report.lon?.toFixed(4)}`
+    : `Zone ID: ${report.zoneId}`;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{label}</Text>
-      <Text style={styles.detail}>{where}</Text>
-      <Text>{report.note}</Text>
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.approve} onPress={onApprove}>
-          <Text style={styles.btnText}>Approve</Text>
+      {/* Type badge */}
+      <View style={[styles.typeBadge, isAdd ? styles.typeBadgeAdd : styles.typeBadgeRemove]}>
+        <Text style={[styles.typeBadgeText, isAdd ? styles.typeBadgeTextAdd : styles.typeBadgeTextRemove]}>
+          {isAdd ? '➕ Add School' : '🗑️ Remove Zone'}
+        </Text>
+      </View>
+
+      <Text style={styles.whereText}>{where}</Text>
+      <Text style={styles.noteText}>{report.note}</Text>
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.approveBtn} onPress={onApprove}>
+          <LinearGradient colors={['#22c55e', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGradient}>
+            <Text style={styles.btnText}>✓ Approve</Text>
+          </LinearGradient>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reject} onPress={onReject}>
-          <Text style={styles.btnText}>Reject</Text>
+        <TouchableOpacity style={styles.rejectBtn} onPress={onReject}>
+          <Text style={styles.rejectBtnText}>✕ Reject</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -40,71 +51,107 @@ export default function ReviewReportsScreen() {
   const { users, currentUserId } = useAuth();
   const currentUser = users.find((u) => u.id === currentUserId);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const pending = reports.filter((r) => r.status === 'pending');
 
   if (currentUser?.role !== 'admin') {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.header}>Admin only</Text>
-        <Text style={styles.empty}>Only admins can review school zone reports.</Text>
-      </View>
+      <LinearGradient colors={['#0e1428', '#1a1f38']} style={styles.screen}>
+        <View style={styles.centered}>
+          <Text style={styles.lockIcon}>🔒</Text>
+          <Text style={styles.bigTitle}>Admin Only</Text>
+          <Text style={styles.muted}>Only admins can review school zone reports.</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>Pending reports</Text>
-      {pending.length === 0 ? (
-        <Text style={styles.empty}>Nothing to review.</Text>
-      ) : (
-        pending.map((r) => (
-          <ReportCard
-            key={r.id}
-            report={r}
-            onApprove={async () => {
-              try {
-                await approveReport(r.id);
-                Alert.alert('Done', r.type === 'add' ? 'Zone added on map.' : 'Zone removed from map.');
-              } catch (error) {
-                Alert.alert(
-                  'Could not approve report',
-                  error instanceof Error ? error.message : 'Please try again.'
-                );
-              }
-            }}
-            onReject={async () => {
-              try {
-                await rejectReport(r.id);
-                Alert.alert('Done', 'Report rejected.');
-              } catch (error) {
-                Alert.alert(
-                  'Could not reject report',
-                  error instanceof Error ? error.message : 'Please try again.'
-                );
-              }
-            }}
-          />
-        ))
-      )}
-    </ScrollView>
+    <LinearGradient colors={['#0e1428', '#1a1f38']} style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {pending.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptyIcon}>✅</Text>
+            <Text style={styles.bigTitle}>All caught up!</Text>
+            <Text style={styles.muted}>No pending reports to review.</Text>
+          </View>
+        ) : (
+          pending.map((r) => (
+            <ReportCard
+              key={r.id}
+              report={r}
+              onApprove={async () => {
+                try {
+                  await approveReport(r.id);
+                  Alert.alert('Done', r.type === 'add' ? 'Zone added.' : 'Zone removed.');
+                } catch (error) {
+                  Alert.alert('Could not approve', error instanceof Error ? error.message : 'Please try again.');
+                }
+              }}
+              onReject={async () => {
+                try {
+                  await rejectReport(r.id);
+                  Alert.alert('Done', 'Report rejected.');
+                } catch (error) {
+                  Alert.alert('Could not reject', error instanceof Error ? error.message : 'Please try again.');
+                }
+              }}
+            />
+          ))
+        )}
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  centered: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  content: { padding: 20 },
-  header: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
-  empty: { color: '#888' },
-  card: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, marginBottom: 14 },
-  title: { fontSize: 17, fontWeight: '600' },
-  detail: { color: '#555', marginVertical: 6 },
-  buttons: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  approve: { flex: 1, backgroundColor: '#2e7d32', padding: 12, borderRadius: 8, alignItems: 'center' },
-  reject: { flex: 1, backgroundColor: '#c62828', padding: 12, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '600' },
+  screen:   { flex: 1 },
+  content:  { padding: Spacing.xl, paddingBottom: Spacing.huge },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xxxl },
+  lockIcon: { fontSize: 48, marginBottom: Spacing.md },
+  emptyIcon:{ fontSize: 48, marginBottom: Spacing.md },
+  bigTitle: { ...Typography.h2, marginBottom: Spacing.sm },
+  muted:    { ...Typography.muted, textAlign: 'center' },
+
+  card: {
+    backgroundColor: Glass.background,
+    borderWidth: Glass.borderWidth,
+    borderColor: Glass.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    ...Shadows.sm,
+  },
+  typeBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.pill,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+  },
+  typeBadgeAdd:         { backgroundColor: 'rgba(255,133,82,0.15)', borderColor: 'rgba(255,133,82,0.4)' },
+  typeBadgeRemove:      { backgroundColor: 'rgba(139,143,163,0.15)', borderColor: 'rgba(139,143,163,0.3)' },
+  typeBadgeText:        { fontSize: 12, fontWeight: '700' },
+  typeBadgeTextAdd:     { color: Colors.accent },
+  typeBadgeTextRemove:  { color: Colors.mutedText },
+
+  whereText: { ...Typography.bodyBold, color: Colors.mutedText, marginBottom: Spacing.sm },
+  noteText:  { ...Typography.body, color: Colors.white, marginBottom: Spacing.lg },
+
+  buttonRow:   { flexDirection: 'row', gap: Spacing.sm },
+  approveBtn:  { flex: 1, borderRadius: BorderRadius.sm, overflow: 'hidden' },
+  btnGradient: { paddingVertical: Spacing.sm + 2, alignItems: 'center' },
+  btnText:     { color: Colors.white, fontWeight: '700', fontSize: 14 },
+
+  rejectBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm + 2,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.4)',
+    borderRadius: BorderRadius.sm,
+  },
+  rejectBtnText: { color: Colors.error, fontWeight: '700', fontSize: 14 },
 });

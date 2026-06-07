@@ -488,6 +488,7 @@ as $$
 $$;
 
 revoke all on function private.can_rate_route(uuid, uuid) from public;
+grant execute on function private.can_rate_route(uuid, uuid) to authenticated;
 
 drop policy if exists "Users can read their ratings" on public.route_ratings;
 create policy "Users can read their ratings"
@@ -806,3 +807,70 @@ end $$;
 -- New accounts are always regular users. Promote an account only from the
 -- SQL Editor or another trusted server environment:
 -- update public.profiles set role = 'admin' where email = 'admin@example.com';
+
+-- Map notes (location comments) table
+create table if not exists public.map_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  user_name text not null default 'Cyclist',
+  lat double precision not null,
+  lon double precision not null,
+  text text not null check (char_length(trim(text)) between 1 and 500),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists map_notes_coords_idx on public.map_notes (lat, lon);
+
+alter table public.map_notes enable row level security;
+
+revoke all on table public.map_notes from anon, authenticated;
+grant select, insert, delete on table public.map_notes to authenticated;
+
+-- Trigger to copy user profile name
+create or replace function private.set_map_note_user_name()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.user_id = coalesce(new.user_id, auth.uid());
+  select coalesce(nullif(trim(name), ''), 'Cyclist')
+  into new.user_name
+  from public.profiles
+  where id = new.user_id;
+  new.user_name = coalesce(new.user_name, 'Cyclist');
+  return new;
+end;
+$$;
+
+drop trigger if exists set_map_note_user_name on public.map_notes;
+create trigger set_map_note_user_name
+  before insert on public.map_notes
+  for each row execute procedure private.set_map_note_user_name();
+
+-- Policies
+drop policy if exists "Authenticated users can read map notes" on public.map_notes;
+create policy "Authenticated users can read map notes"
+on public.map_notes for select
+to authenticated
+using (true);
+
+drop policy if exists "Users can insert their own map notes" on public.map_notes;
+create policy "Users can insert their own map notes"
+on public.map_notes for insert
+to authenticated
+with check ((select auth.uid()) = user_id);
+
+drop policy if exists "Owners and admins can delete map notes" on public.map_notes;
+create policy "Owners and admins can delete map notes"
+on public.map_notes for delete
+to authenticated
+using ((select auth.uid()) = user_id or (select private.is_admin()));
+
+do $$
+begin
+  alter publication supabase_realtime add table public.map_notes;
+exception
+  when duplicate_object then null;
+end $$;

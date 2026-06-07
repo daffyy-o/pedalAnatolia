@@ -1,12 +1,52 @@
-import React, { useEffect } from 'react';
-import { ActivityIndicator, Alert, Button, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import RoutePreviewMap from '../components/RoutePreviewMap';
+import React, { useEffect, useRef } from 'react';
 import {
-  publishedRouteToSnapshot,
-  useRouteBoard,
-} from '../store/routeBoard';
+  Animated,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Pressable,
+} from 'react-native';
+import { Alert } from '../components/CustomAlert';
+import { LinearGradient } from 'expo-linear-gradient';
+import RoutePreviewMap from '../components/RoutePreviewMap';
+import { publishedRouteToSnapshot, useRouteBoard } from '../store/routeBoard';
 import { useAuth } from '../store/auth';
 import { formatDistance, formatDuration } from '../types/routes';
+import { Colors, Spacing, BorderRadius, Typography, Shadows, Gradients, Glass } from '../lib/theme';
+
+function StarButton({
+  rating,
+  selected,
+  disabled,
+  onPress,
+}: {
+  rating: number;
+  selected: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    if (disabled) return;
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.35, speed: 50, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, speed: 50, useNativeDriver: true }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Pressable onPress={handlePress} disabled={disabled}>
+      <Animated.View style={[styles.starBtn, selected && styles.starBtnActive, { transform: [{ scale }] }]}>
+        <Text style={[styles.starText, selected && styles.starTextActive]}>★ {rating}</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export default function RouteDetailScreen({ route: navRoute, navigation }: any) {
   const routeId = navRoute?.params?.routeId;
@@ -25,10 +65,24 @@ export default function RouteDetailScreen({ route: navRoute, navigation }: any) 
     clearSelectedRoute,
   } = useRouteBoard();
 
+  // Mount animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const rideScale = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     if (routeId) void loadRouteDetail(routeId, currentUserId);
     return clearSelectedRoute;
   }, [clearSelectedRoute, currentUserId, loadRouteDetail, routeId]);
+
+  useEffect(() => {
+    if (!detailLoading && selectedRoute) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, speed: 12, bounciness: 3, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [detailLoading, selectedRoute, fadeAnim, slideAnim]);
 
   const handleRate = async (rating: number) => {
     if (!routeId) return;
@@ -61,81 +115,175 @@ export default function RouteDetailScreen({ route: navRoute, navigation }: any) 
 
   if (detailLoading || !selectedRoute) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2e7d32" />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-      </View>
+      <LinearGradient colors={['#0e1428', '#1a1f38']} style={styles.screen}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
+      </LinearGradient>
     );
   }
 
   const canDelete = selectedRoute.ownerId === currentUserId || currentUser?.role === 'admin';
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{selectedRoute.title}</Text>
-      <Text style={styles.publisher}>By {selectedRoute.ownerName}</Text>
-      <Text style={styles.routeLine}>{selectedRoute.originName} -> {selectedRoute.destinationName}</Text>
-      <View style={styles.statsRow}>
-        <Text style={styles.stat}>{formatDistance(selectedRoute.route.distance)}</Text>
-        <Text style={styles.stat}>{formatDuration(selectedRoute.route.time)}</Text>
-        <Text style={styles.stat}>★ {selectedRoute.ratingAverage.toFixed(1)} ({selectedRoute.ratingCount})</Text>
-        <Text style={styles.stat}>{selectedRoute.rideCount} rides</Text>
-      </View>
-      {selectedRoute.description ? <Text style={styles.description}>{selectedRoute.description}</Text> : null}
+    <LinearGradient colors={['#0e1428', '#1a1f38']} style={styles.screen}>
+      <Animated.ScrollView
+        style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+        contentContainerStyle={styles.content}
+      >
+        {/* Header */}
+        <Text style={styles.title}>{selectedRoute.title}</Text>
+        <Text style={styles.publisher}>by {selectedRoute.ownerName}</Text>
+        <Text style={styles.routeLine}>
+          {selectedRoute.originName} → {selectedRoute.destinationName}
+        </Text>
 
-      <RoutePreviewMap route={selectedRoute.route} />
-
-      <View style={styles.actions}>
-        <Button
-          title="Ride this route"
-          onPress={() => navigation.navigate('Map', { loadRoute: publishedRouteToSnapshot(selectedRoute) })}
-        />
-        {canDelete ? <Button title="Delete from board" color="#c62828" onPress={handleDelete} /> : null}
-      </View>
-
-      <View style={styles.ratingPanel}>
-        <Text style={styles.sectionTitle}>Your rating</Text>
-        {canRateSelectedRoute ? (
-          <View style={styles.ratingButtons}>
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <TouchableOpacity
-                key={rating}
-                style={[styles.ratingButton, myRating === rating && styles.activeRating]}
-                disabled={ratingLoading}
-                onPress={() => void handleRate(rating)}
-              >
-                <Text style={[styles.ratingText, myRating === rating && styles.activeRatingText]}>{rating}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillIcon}>📏</Text>
+            <Text style={styles.statPillValue}>{formatDistance(selectedRoute.route.distance)}</Text>
           </View>
-        ) : selectedRoute.ownerId === currentUserId ? (
-          <Text style={styles.muted}>You cannot rate your own route.</Text>
-        ) : (
-          <Text style={styles.muted}>Complete this route before rating it.</Text>
-        )}
-      </View>
-    </ScrollView>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillIcon}>⏱️</Text>
+            <Text style={styles.statPillValue}>{formatDuration(selectedRoute.route.time)}</Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillIcon}>★</Text>
+            <Text style={styles.statPillValue}>
+              {selectedRoute.ratingAverage.toFixed(1)} ({selectedRoute.ratingCount})
+            </Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillIcon}>🚴</Text>
+            <Text style={styles.statPillValue}>{selectedRoute.rideCount} rides</Text>
+          </View>
+        </View>
+
+        {selectedRoute.description ? (
+          <Text style={styles.description}>{selectedRoute.description}</Text>
+        ) : null}
+
+        {/* Map preview */}
+        <RoutePreviewMap route={selectedRoute.route} />
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Map', { loadRoute: publishedRouteToSnapshot(selectedRoute) })}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={Gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.rideButton}
+            >
+              <Text style={styles.rideButtonText}>🚴 Ride This Route</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {canDelete && (
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <Text style={styles.deleteButtonText}>Delete from Board</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Rating panel */}
+        <View style={styles.ratingCard}>
+          <Text style={styles.ratingTitle}>Your Rating</Text>
+          {canRateSelectedRoute ? (
+            <View style={styles.starRow}>
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <StarButton
+                  key={rating}
+                  rating={rating}
+                  selected={myRating === rating}
+                  disabled={ratingLoading}
+                  onPress={() => void handleRate(rating)}
+                />
+              ))}
+            </View>
+          ) : selectedRoute.ownerId === currentUserId ? (
+            <Text style={styles.ratingMuted}>You cannot rate your own route.</Text>
+          ) : (
+            <Text style={styles.ratingMuted}>Complete this route before rating it.</Text>
+          )}
+        </View>
+      </Animated.ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f5f7f8' },
-  content: { padding: 16 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 20 },
-  error: { color: '#c62828', marginTop: 12, fontWeight: '700' },
-  title: { fontSize: 24, fontWeight: '800', color: '#222' },
-  publisher: { color: '#666', marginTop: 4 },
-  routeLine: { color: '#333', marginTop: 10, fontWeight: '600' },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  stat: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, color: '#2e7d32', fontWeight: '700' },
-  description: { marginTop: 14, color: '#444', lineHeight: 20 },
-  actions: { gap: 10, marginTop: 14 },
-  ratingPanel: { marginTop: 18, backgroundColor: '#fff', borderRadius: 8, padding: 14, borderWidth: 1, borderColor: '#e0e0e0' },
-  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 10 },
-  ratingButtons: { flexDirection: 'row', gap: 8 },
-  ratingButton: { width: 42, height: 42, borderRadius: 6, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' },
-  activeRating: { backgroundColor: '#2e7d32' },
-  ratingText: { fontWeight: '800', color: '#333' },
-  activeRatingText: { color: '#fff' },
-  muted: { color: '#666' },
+  screen:   { flex: 1 },
+  content:  { padding: Spacing.xl, paddingBottom: Spacing.huge },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText:{ ...Typography.body, color: Colors.error, marginTop: Spacing.md },
+
+  title:     { ...Typography.h1, marginBottom: Spacing.xs },
+  publisher: { ...Typography.muted, marginBottom: Spacing.sm },
+  routeLine: { ...Typography.bodyBold, color: Colors.surface, marginBottom: Spacing.lg },
+
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
+  statPill: {
+    backgroundColor: Glass.background,
+    borderWidth: Glass.borderWidth,
+    borderColor: Glass.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.xs,
+  },
+  statPillIcon:  { fontSize: 14 },
+  statPillValue: { ...Typography.bodyBold, color: Colors.primary },
+
+  description: { ...Typography.body, lineHeight: 22, marginBottom: Spacing.lg, color: Colors.surface },
+
+  actions:    { gap: Spacing.sm, marginTop: Spacing.xl },
+  rideButton: {
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md + 2,
+    alignItems: 'center',
+    ...Shadows.glow,
+  },
+  rideButtonText: { color: Colors.white, fontWeight: '800', fontSize: 16, letterSpacing: 0.3 },
+
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.4)',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  deleteButtonText: { color: Colors.error, fontWeight: '700' },
+
+  ratingCard: {
+    backgroundColor: Glass.background,
+    borderWidth: Glass.borderWidth,
+    borderColor: Glass.border,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginTop: Spacing.xl,
+  },
+  ratingTitle: { ...Typography.h4, marginBottom: Spacing.md },
+  starRow:     { flexDirection: 'row', gap: Spacing.sm },
+  starBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starBtnActive:    { backgroundColor: 'rgba(255,133,82,0.25)', borderColor: 'rgba(255,133,82,0.5)' },
+  starText:         { fontWeight: '700', color: Colors.mutedText, fontSize: 13 },
+  starTextActive:   { color: Colors.accent },
+  ratingMuted:      { ...Typography.muted },
 });
