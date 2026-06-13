@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
+    "prestart": "node scripts/update-ip.js",
+    "prestart:go": "node scripts/update-ip.js",
+    "prestart:tunnel": "node scripts/update-ip.js",
+    "preandroid": "node scripts/update-ip.js",
+    "preios": "node scripts/update-ip.js",
+    "preweb": "node scripts/update-ip.js",
     "start": "expo start",
     "start:go": "expo start --go",
     "start:tunnel": "expo start --go --tunnel",

@@ -1,5 +1,3 @@
-import bundled from '../data/school-zones.json';
-
 export interface SchoolZoneFeature {
   type: 'Feature';
   id: string;
@@ -10,14 +8,13 @@ export interface SchoolZoneFeature {
   };
 }
 
-/** Zones from the JSON file, minus removed, plus added from approved reports. */
+/** Zones from approved reports. */
 export function getSchoolZoneFeatures(
   overrides: { added: SchoolZoneFeature[]; removedIds: string[] }
 ): SchoolZoneFeature[] {
   const removed = new Set(overrides.removedIds.map(String));
-  const base = (bundled.features as SchoolZoneFeature[]).filter((z) => !removed.has(String(z.id)));
   const added = overrides.added.filter((z) => !removed.has(String(z.id)));
-  return [...base, ...added];
+  return added;
 }
 
 /** For react-native-maps Polygon. */

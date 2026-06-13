@@ -3,7 +3,7 @@ set -e
 
 cd "$(dirname "$0")/.." || exit
 
-PBF_FILE="${PBF_FILE:-turkey-260226.osm.pbf}"
+PBF_FILE="${PBF_FILE:-turkey-260611.osm.pbf}"
 
 if [ ! -f "graphhopper.jar" ]; then
     echo "Downloading GraphHopper..."
@@ -15,8 +15,6 @@ if [ ! -f "$PBF_FILE" ]; then
     exit 1
 fi
 
-echo "Building school zone routing config from data/school-zones.geojson ..."
-python3 scripts/build_school_model.py
 
 echo "Running GraphHopper import on $PBF_FILE ..."
 java -Ddw.graphhopper.datareader.file="$PBF_FILE" -jar graphhopper.jar import config.yml

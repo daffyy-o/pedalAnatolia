@@ -1,7 +1,7 @@
 graphhopper:
   import.osm.ignored_highways: ""
   graph.encoded_values: bike_priority, bike_access, roundabout, road_class, road_environment, bike_average_speed
-  datareader.file: turkey-260226.osm.pbf
+  datareader.file: turkey-260611.osm.pbf
   graph.location: graph-cache
   profiles:
     - name: bike

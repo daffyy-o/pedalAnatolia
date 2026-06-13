@@ -29,7 +29,7 @@ const getBaseUrl = (): string => {
   }
 
   // Fallback to the current PC IP if dynamic parsing fails
-  return 'http://10.2.122.52:8989';
+  return 'http://10.5.57.105:8989'; // AUTO-UPDATED-IP-FALLBACK
 };
 
 const BASE_URL = getBaseUrl();
