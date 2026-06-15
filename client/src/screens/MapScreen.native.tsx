@@ -29,8 +29,8 @@ import { getHiddenCounters } from '../lib/stats';
 import { Colors, Spacing, BorderRadius, Typography, Shadows, Gradients, Glass } from '../lib/theme';
 
 const TURKEY = {
-  latitude: 39.92077,
-  longitude: 32.85411,
+  latitude: 41.00,
+  longitude: 29.13,
   latitudeDelta: 10,
   longitudeDelta: 15,
 };
@@ -157,8 +157,10 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [customRouteName, setCustomRouteName] = useState('');
   const [commentMode, setCommentMode] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
   const [commentModalVisible, setCommentModalVisible] = useState(false);
   const [selectedCommentPoint, setSelectedCommentPoint] = useState<{ lat: number; lon: number } | null>(null);
+  const [selectedReportPoint, setSelectedReportPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [newComment, setNewComment] = useState('');
   const [completedRouteKey, setCompletedRouteKey] = useState('');
 
@@ -198,6 +200,10 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
       setNewComment('');
       setCommentModalVisible(true);
       setCommentMode(false);
+      return;
+    } else if(isReporting) {
+      setSelectedReportPoint({ lat: latitude, lon: longitude });
+      setIsReporting(false);
       return;
     }
     onMapTap(latitude, longitude);

@@ -8,8 +8,8 @@ import { getSchoolZoneFeatures, zoneToMapCoords } from '../lib/schoolZones';
 import { Colors } from '../lib/theme';
 
 const START = {
-  latitude: 39.92,
-  longitude: 32.85,
+  latitude: 41.00,
+  longitude: 29.13,
   latitudeDelta: 10,
   longitudeDelta: 15,
 };
