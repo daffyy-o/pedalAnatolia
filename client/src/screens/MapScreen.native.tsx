@@ -342,6 +342,12 @@ export default function MapScreen({ route: navRoute, navigation }: any) {
           {(origin || destination || route) && (
             <PillButton label="Clear" icon="✕" onPress={clearAll} />
           )}
+          {/* <PillButton
+            label={`comments (${comments.length})`}
+            icon="💬"
+            onPress={() => { }}
+          />*/}
+          
           <PillButton label="Saved" icon="⭐" onPress={() => navigation.navigate('SavedRoutes')} />
           <PillButton label="Board" icon="📋" onPress={() => navigation.navigate('RouteBoard')} />
           <PillButton
